@@ -83,8 +83,9 @@ def _building_job_capacity(province) -> int:
     total = 0
     for building in province.buildings.filter(is_active=True, under_construction=False):
         b_def = BUILDING_TYPES.get(building.building_type)
-        if b_def and 1 <= building.level <= len(b_def["levels"]):
-            total += b_def["levels"][building.level - 1]["workers"]
+        if b_def and building.level >= 1:
+            from provinces.building_constants import get_level_data
+            total += get_level_data(building.building_type, building.level)["workers"]
     return total
 
 

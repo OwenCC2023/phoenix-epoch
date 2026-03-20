@@ -17,11 +17,15 @@ Efficiency modifier sources (each is separately additive)
 1. Government type  — GOVERNMENT_TYPES[gov]["building_efficiency"][category]
 2. Trait bonuses    — building_efficiency_bonus from ideology traits
 3. GM crisis/boon   — NationModifier(category="building_efficiency", target=category_or_"all")
-4. Input co-location— province terrain primary resource is in building's input_goods  (+INPUT_COLOCATION_BONUS)
-5. Industry cluster — each other active building of same category in province          (+INDUSTRY_CLUSTER_BONUS each)
+4. Input co-location— province terrain primary resource is in building's input_goods (+INPUT_COLOCATION_BONUS)
+5. Concentration    — SAME_TYPE × building.level  +  SAME_CATEGORY × other_category_levels
+                      (replaces old per-building INDUSTRY_CLUSTER_BONUS)
 
 Sources 1-3 are national (same for all buildings of a given category).
 Sources 4-5 are per-building/per-province.
+
+Buildings have unlimited levels. All level-specific data is obtained via
+get_level_data(building_type, level) from provinces.building_constants.
 """
 
 # Basic resource keys stored in NationResourcePool
@@ -42,17 +46,16 @@ def get_province_building_effects(province):
 
     Returns a dict keyed by PROVINCE_EFFECT_KEYS, values are floats (additive).
     """
-    from provinces.building_constants import BUILDING_TYPES, PROVINCE_EFFECT_KEYS
+    from provinces.building_constants import BUILDING_TYPES, PROVINCE_EFFECT_KEYS, get_level_data
 
     effects = {k: 0.0 for k in PROVINCE_EFFECT_KEYS}
     for building in province.buildings.all():
         if not building.is_active or building.under_construction:
             continue
-        b_def = BUILDING_TYPES.get(building.building_type)
-        if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+        if building.building_type not in BUILDING_TYPES or building.level < 1:
             continue
-        level_data = b_def["levels"][building.level - 1]
-        for k, v in level_data.get("effects", {}).items():
+        level_data = get_level_data(building.building_type, building.level)
+        for k, v in level_data["effects"].items():
             if k in effects:
                 effects[k] += v
     return effects
@@ -64,18 +67,17 @@ def get_national_building_effects(provinces):
 
     Returns a dict keyed by NATIONAL_EFFECT_KEYS, values are floats (additive).
     """
-    from provinces.building_constants import BUILDING_TYPES, NATIONAL_EFFECT_KEYS
+    from provinces.building_constants import BUILDING_TYPES, NATIONAL_EFFECT_KEYS, get_level_data
 
     effects = {k: 0.0 for k in NATIONAL_EFFECT_KEYS}
     for province in provinces:
         for building in province.buildings.all():
             if not building.is_active or building.under_construction:
                 continue
-            b_def = BUILDING_TYPES.get(building.building_type)
-            if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+            if building.building_type not in BUILDING_TYPES or building.level < 1:
                 continue
-            level_data = b_def["levels"][building.level - 1]
-            for k, v in level_data.get("effects", {}).items():
+            level_data = get_level_data(building.building_type, building.level)
+            for k, v in level_data["effects"].items():
                 if k in effects:
                     effects[k] += v
     return effects
@@ -85,18 +87,17 @@ def get_construction_modifiers(nation):
     """
     Return the national construction_cost_reduction fraction for a nation, clamped to [0, 0.75].
     """
-    from provinces.building_constants import BUILDING_TYPES, NATIONAL_EFFECT_KEYS
+    from provinces.building_constants import BUILDING_TYPES, get_level_data
 
     cost_reduction = 0.0
     for province in nation.provinces.all():
         for building in province.buildings.all():
             if not building.is_active or building.under_construction:
                 continue
-            b_def = BUILDING_TYPES.get(building.building_type)
-            if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+            if building.building_type not in BUILDING_TYPES or building.level < 1:
                 continue
-            level_data = b_def["levels"][building.level - 1]
-            cost_reduction += level_data.get("effects", {}).get("construction_cost_reduction", 0.0)
+            level_data = get_level_data(building.building_type, building.level)
+            cost_reduction += level_data["effects"].get("construction_cost_reduction", 0.0)
 
     return min(0.75, cost_reduction)
 
@@ -116,7 +117,7 @@ def get_building_efficiency_modifiers(nation, turn_number):
     Returns a flat dict mapping building category (or "all") → total bonus float.
     Example: {"heavy_manufacturing": 0.30, "financial": 0.22, "all": -0.15}
 
-    Sources 4 (co-location) and 5 (clustering) are per-province and computed in
+    Sources 4 (co-location) and 5 (concentration) are per-province and computed in
     compute_building_efficiency().
     """
     from economy.constants import GOVERNMENT_TYPES
@@ -146,9 +147,10 @@ def get_building_efficiency_modifiers(nation, turn_number):
 
 def compute_building_efficiency(
     building_type,
+    building_level,
     level_data,
     province_terrain,
-    province_category_counts,
+    province_category_level_sums,
     province_building_outputs,
     building_efficiency_modifiers,
 ):
@@ -159,13 +161,15 @@ def compute_building_efficiency(
     ----------
     building_type : str
         Key from BUILDING_TYPES.
+    building_level : int
+        Current level of this specific building instance.
     level_data : dict
-        The level config dict for this building's current level.
+        The level config dict from get_level_data() for this building's current level.
     province_terrain : str
         Terrain type of the province (used for co-location check).
-    province_category_counts : dict[str, int]
-        {category: count} of ALL active buildings in this province (including
-        this building itself — cluster formula subtracts 1 for self).
+    province_category_level_sums : dict[str, int]
+        {category: total_level_sum} of ALL active buildings in this province.
+        Used for concentration bonus (includes this building's own level).
     province_building_outputs : set[str]
         Set of goods produced by ALL active buildings in this province.
         Used to detect intra-province supply chain co-location.
@@ -184,12 +188,15 @@ def compute_building_efficiency(
     colocation     : +INPUT_COLOCATION_BONUS if ANY of this building's input goods
                      are produced locally — either by the province terrain's primary
                      resource or by another active building in the same province
-    cluster        : +INDUSTRY_CLUSTER_BONUS × (same-category buildings − 1)
+    concentration  : SAME_TYPE_CONCENTRATION_BONUS × building_level
+                     + SAME_CATEGORY_CONCENTRATION_BONUS × (category_total − building_level)
+                     Rewards both deep investment in a single type and broad category clusters.
     """
     from provinces.building_constants import (
         BUILDING_TYPES,
         INPUT_COLOCATION_BONUS,
-        INDUSTRY_CLUSTER_BONUS,
+        SAME_TYPE_CONCENTRATION_BONUS,
+        SAME_CATEGORY_CONCENTRATION_BONUS,
     )
     from provinces.jobs import terrain_primary_resource
 
@@ -211,12 +218,18 @@ def compute_building_efficiency(
     locally_supplied = (province_primary in input_keys) or bool(input_keys & province_building_outputs)
     colocation_bonus = INPUT_COLOCATION_BONUS if locally_supplied else 0.0
 
-    # --- Source 5: industry clustering ---
-    # province_category_counts includes this building; subtract 1 for self.
-    cluster_count = max(0, province_category_counts.get(category, 0) - 1)
-    cluster_bonus = cluster_count * INDUSTRY_CLUSTER_BONUS
+    # --- Source 5: concentration bonus ---
+    # same_type_score  = this building's level (unique per province, so equals total type sum)
+    # same_category_score = total category level sum minus this building's own level
+    same_type_score = building_level
+    category_total = province_category_level_sums.get(category, 0)
+    other_category_score = max(0, category_total - building_level)
+    concentration_bonus = (
+        SAME_TYPE_CONCENTRATION_BONUS * same_type_score
+        + SAME_CATEGORY_CONCENTRATION_BONUS * other_category_score
+    )
 
-    return 1.0 + nat_bonus + colocation_bonus + cluster_bonus
+    return 1.0 + nat_bonus + colocation_bonus + concentration_bonus
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +247,7 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
     Efficiency multiplier is applied to outputs only (not inputs) and combines:
       - Designation multiplier (urban provinces produce more)
       - Multi-source efficiency from get_building_efficiency_modifiers() +
-        compute_building_efficiency() (gov/traits/GM/colocation/cluster)
+        compute_building_efficiency() (gov/traits/GM/colocation/concentration)
 
     Input goods are split between NationResourcePool (basic resources) and
     NationGoodStock (manufactured goods).  Output goods are routed to whichever
@@ -246,7 +259,7 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
         Pre-computed national efficiency modifiers from get_building_efficiency_modifiers().
         Pass an empty dict if callers do not need the modifier system.
     """
-    from provinces.building_constants import BUILDING_TYPES
+    from provinces.building_constants import BUILDING_TYPES, get_level_data
     from .models import NationGoodStock, NationResourcePool
 
     pool = NationResourcePool.objects.get(nation=nation)
@@ -255,23 +268,26 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
     # ------------------------------------------------------------------
     # Pre-compute per-province snapshots for efficiency bonuses.
     # Both use province.buildings.all() so the prefetch cache is hit.
+    # province_category_level_sums: province.id → {category: total level sum}
+    # province_building_outputs:    province.id → set of goods produced
     # ------------------------------------------------------------------
-    province_category_counts = {}   # province.id → {category: count}
-    province_building_outputs = {}  # province.id → set of goods produced by active buildings
+    province_category_level_sums = {}
+    province_building_outputs = {}
     for province in provinces:
-        counts = {}
+        level_sums = {}
         outputs = set()
         for building in province.buildings.all():
             if not building.is_active or building.under_construction:
                 continue
-            b_def = BUILDING_TYPES.get(building.building_type, {})
+            if building.building_type not in BUILDING_TYPES or building.level < 1:
+                continue
+            b_def = BUILDING_TYPES[building.building_type]
             cat = b_def.get("category", "")
             if cat:
-                counts[cat] = counts.get(cat, 0) + 1
-            lvl = building.level
-            if b_def and 1 <= lvl <= len(b_def.get("levels", [])):
-                outputs.update(b_def["levels"][lvl - 1]["output_goods"])
-        province_category_counts[province.id] = counts
+                level_sums[cat] = level_sums.get(cat, 0) + building.level
+            lvl_data = get_level_data(building.building_type, building.level)
+            outputs.update(lvl_data["output_goods"])
+        province_category_level_sums[province.id] = level_sums
         province_building_outputs[province.id] = outputs
 
     # ------------------------------------------------------------------
@@ -287,10 +303,9 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
         for building in province.buildings.all():
             if not building.is_active or building.under_construction:
                 continue
-            b_def = BUILDING_TYPES.get(building.building_type)
-            if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+            if building.building_type not in BUILDING_TYPES or building.level < 1:
                 continue
-            level_data = b_def["levels"][building.level - 1]
+            level_data = get_level_data(building.building_type, building.level)
             designation = getattr(province, "designation", "rural")
             active_buildings.append((
                 building, level_data, wf, designation,
@@ -328,9 +343,10 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
         designation_mult = DESIGNATION_BUILDING_MODIFIER.get(designation, 1.0)
         efficiency_mult = compute_building_efficiency(
             bldg.building_type,
+            bldg.level,
             level_data,
             province_terrain,
-            province_category_counts.get(province_id, {}),
+            province_category_level_sums.get(province_id, {}),
             province_building_outputs.get(province_id, set()),
             building_efficiency_modifiers,
         )

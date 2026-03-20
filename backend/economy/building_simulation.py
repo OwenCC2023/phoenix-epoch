@@ -1,0 +1,384 @@
+"""
+Building production simulation.
+
+Handles manufactured goods production/consumption each turn, building effect
+helpers, and the multi-source building efficiency modifier system.
+
+Building output each turn
+=========================
+  output = amount × effective_capacity × designation_mult × efficiency_mult
+
+effective_capacity = min(worker_capacity_factor, input_goods_capacity)
+designation_mult   = DESIGNATION_BUILDING_MODIFIER[province.designation]
+efficiency_mult    = 1.0 + sum(all efficiency bonuses below)
+
+Efficiency modifier sources (each is separately additive)
+----------------------------------------------------------
+1. Government type  — GOVERNMENT_TYPES[gov]["building_efficiency"][category]
+2. Trait bonuses    — building_efficiency_bonus from ideology traits
+3. GM crisis/boon   — NationModifier(category="building_efficiency", target=category_or_"all")
+4. Input co-location— province terrain primary resource is in building's input_goods  (+INPUT_COLOCATION_BONUS)
+5. Industry cluster — each other active building of same category in province          (+INDUSTRY_CLUSTER_BONUS each)
+
+Sources 1-3 are national (same for all buildings of a given category).
+Sources 4-5 are per-building/per-province.
+"""
+
+# Basic resource keys stored in NationResourcePool
+_POOL_RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
+
+from provinces.constants import DESIGNATION_BUILDING_MODIFIER
+
+
+# ---------------------------------------------------------------------------
+# Building effect helpers (used by main simulation loop)
+# ---------------------------------------------------------------------------
+
+def get_province_building_effects(province):
+    """
+    Sum all province-scope effects from active, non-under-construction buildings.
+
+    Uses province.buildings.all() so Django's prefetch_related cache is honoured.
+
+    Returns a dict keyed by PROVINCE_EFFECT_KEYS, values are floats (additive).
+    """
+    from provinces.building_constants import BUILDING_TYPES, PROVINCE_EFFECT_KEYS
+
+    effects = {k: 0.0 for k in PROVINCE_EFFECT_KEYS}
+    for building in province.buildings.all():
+        if not building.is_active or building.under_construction:
+            continue
+        b_def = BUILDING_TYPES.get(building.building_type)
+        if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+            continue
+        level_data = b_def["levels"][building.level - 1]
+        for k, v in level_data.get("effects", {}).items():
+            if k in effects:
+                effects[k] += v
+    return effects
+
+
+def get_national_building_effects(provinces):
+    """
+    Sum all national-scope effects from active buildings across all provinces.
+
+    Returns a dict keyed by NATIONAL_EFFECT_KEYS, values are floats (additive).
+    """
+    from provinces.building_constants import BUILDING_TYPES, NATIONAL_EFFECT_KEYS
+
+    effects = {k: 0.0 for k in NATIONAL_EFFECT_KEYS}
+    for province in provinces:
+        for building in province.buildings.all():
+            if not building.is_active or building.under_construction:
+                continue
+            b_def = BUILDING_TYPES.get(building.building_type)
+            if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+                continue
+            level_data = b_def["levels"][building.level - 1]
+            for k, v in level_data.get("effects", {}).items():
+                if k in effects:
+                    effects[k] += v
+    return effects
+
+
+def get_construction_modifiers(nation):
+    """
+    Return the national construction_cost_reduction fraction for a nation, clamped to [0, 0.75].
+    """
+    from provinces.building_constants import BUILDING_TYPES, NATIONAL_EFFECT_KEYS
+
+    cost_reduction = 0.0
+    for province in nation.provinces.all():
+        for building in province.buildings.all():
+            if not building.is_active or building.under_construction:
+                continue
+            b_def = BUILDING_TYPES.get(building.building_type)
+            if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+                continue
+            level_data = b_def["levels"][building.level - 1]
+            cost_reduction += level_data.get("effects", {}).get("construction_cost_reduction", 0.0)
+
+    return min(0.75, cost_reduction)
+
+
+# ---------------------------------------------------------------------------
+# Building efficiency — multi-source modifier system
+# ---------------------------------------------------------------------------
+
+def get_building_efficiency_modifiers(nation, turn_number):
+    """
+    Aggregate national building efficiency modifiers from three sources:
+
+      1. Government type  — GOVERNMENT_TYPES[gov]["building_efficiency"]
+      2. Trait bonuses    — building_efficiency_bonus from ideology traits
+      3. GM NationModifiers with category="building_efficiency"
+
+    Returns a flat dict mapping building category (or "all") → total bonus float.
+    Example: {"heavy_manufacturing": 0.30, "financial": 0.22, "all": -0.15}
+
+    Sources 4 (co-location) and 5 (clustering) are per-province and computed in
+    compute_building_efficiency().
+    """
+    from economy.constants import GOVERNMENT_TYPES
+    from nations.helpers import get_nation_trait_effects
+
+    merged = {}
+
+    # Source 1: government type
+    gov_def = GOVERNMENT_TYPES.get(nation.government_type, {})
+    for cat, bonus in gov_def.get("building_efficiency", {}).items():
+        merged[cat] = merged.get(cat, 0.0) + bonus
+
+    # Source 2: trait building_efficiency_bonus
+    trait_effects = get_nation_trait_effects(nation)
+    for cat, bonus in trait_effects.get("building_efficiency_bonus", {}).items():
+        merged[cat] = merged.get(cat, 0.0) + bonus
+
+    # Source 3: active GM NationModifiers (crises and boons)
+    for mod in nation.modifiers.all():
+        if mod.expires_turn and mod.expires_turn < turn_number:
+            continue
+        if mod.category == "building_efficiency":
+            merged[mod.target] = merged.get(mod.target, 0.0) + mod.value
+
+    return merged
+
+
+def compute_building_efficiency(
+    building_type,
+    level_data,
+    province_terrain,
+    province_category_counts,
+    province_building_outputs,
+    building_efficiency_modifiers,
+):
+    """
+    Compute the total efficiency multiplier for a single building instance.
+
+    Parameters
+    ----------
+    building_type : str
+        Key from BUILDING_TYPES.
+    level_data : dict
+        The level config dict for this building's current level.
+    province_terrain : str
+        Terrain type of the province (used for co-location check).
+    province_category_counts : dict[str, int]
+        {category: count} of ALL active buildings in this province (including
+        this building itself — cluster formula subtracts 1 for self).
+    province_building_outputs : set[str]
+        Set of goods produced by ALL active buildings in this province.
+        Used to detect intra-province supply chain co-location.
+    building_efficiency_modifiers : dict[str, float]
+        National modifiers from get_building_efficiency_modifiers().
+
+    Returns
+    -------
+    float
+        Efficiency multiplier ≥ 0. Values above 1.0 mean above-baseline output.
+
+    Efficiency components (all additive, all separate sources)
+    -----------------------------------------------------------
+    nat_bonus      : gov + traits + GM modifiers for this building's category
+                     plus any "all" modifier
+    colocation     : +INPUT_COLOCATION_BONUS if ANY of this building's input goods
+                     are produced locally — either by the province terrain's primary
+                     resource or by another active building in the same province
+    cluster        : +INDUSTRY_CLUSTER_BONUS × (same-category buildings − 1)
+    """
+    from provinces.building_constants import (
+        BUILDING_TYPES,
+        INPUT_COLOCATION_BONUS,
+        INDUSTRY_CLUSTER_BONUS,
+    )
+    from provinces.jobs import terrain_primary_resource
+
+    b_def = BUILDING_TYPES.get(building_type, {})
+    category = b_def.get("category", "")
+
+    # --- Source 1/2/3: national modifier (gov + traits + GM) ---
+    nat_bonus = (
+        building_efficiency_modifiers.get("all", 0.0)
+        + building_efficiency_modifiers.get(category, 0.0)
+    )
+
+    # --- Source 4: input co-location ---
+    # Fires if ANY input good is available locally, from either:
+    #   (a) terrain: the province's primary resource matches an input good, or
+    #   (b) supply chain: another active building in the province produces an input good.
+    input_keys = set(level_data["input_goods"])
+    province_primary = terrain_primary_resource(province_terrain)
+    locally_supplied = (province_primary in input_keys) or bool(input_keys & province_building_outputs)
+    colocation_bonus = INPUT_COLOCATION_BONUS if locally_supplied else 0.0
+
+    # --- Source 5: industry clustering ---
+    # province_category_counts includes this building; subtract 1 for self.
+    cluster_count = max(0, province_category_counts.get(category, 0) - 1)
+    cluster_bonus = cluster_count * INDUSTRY_CLUSTER_BONUS
+
+    return 1.0 + nat_bonus + colocation_bonus + cluster_bonus
+
+
+# ---------------------------------------------------------------------------
+# Main production functions
+# ---------------------------------------------------------------------------
+
+def simulate_building_production(nation, provinces, province_job_status, building_efficiency_modifiers):
+    """
+    Process manufactured-goods production for all buildings in a nation.
+
+    Capacity is the stricter of two independent limits:
+      - Worker capacity   (per province): filled_jobs / job_capacity
+      - Input goods capacity (national):  min(available[good] / needed[good])
+
+    Efficiency multiplier is applied to outputs only (not inputs) and combines:
+      - Designation multiplier (urban provinces produce more)
+      - Multi-source efficiency from get_building_efficiency_modifiers() +
+        compute_building_efficiency() (gov/traits/GM/colocation/cluster)
+
+    Input goods are split between NationResourcePool (basic resources) and
+    NationGoodStock (manufactured goods).  Output goods are routed to whichever
+    store owns that field.
+
+    Parameters
+    ----------
+    building_efficiency_modifiers : dict
+        Pre-computed national efficiency modifiers from get_building_efficiency_modifiers().
+        Pass an empty dict if callers do not need the modifier system.
+    """
+    from provinces.building_constants import BUILDING_TYPES
+    from .models import NationGoodStock, NationResourcePool
+
+    pool = NationResourcePool.objects.get(nation=nation)
+    good_stock, _ = NationGoodStock.objects.get_or_create(nation=nation)
+
+    # ------------------------------------------------------------------
+    # Pre-compute per-province snapshots for efficiency bonuses.
+    # Both use province.buildings.all() so the prefetch cache is hit.
+    # ------------------------------------------------------------------
+    province_category_counts = {}   # province.id → {category: count}
+    province_building_outputs = {}  # province.id → set of goods produced by active buildings
+    for province in provinces:
+        counts = {}
+        outputs = set()
+        for building in province.buildings.all():
+            if not building.is_active or building.under_construction:
+                continue
+            b_def = BUILDING_TYPES.get(building.building_type, {})
+            cat = b_def.get("category", "")
+            if cat:
+                counts[cat] = counts.get(cat, 0) + 1
+            lvl = building.level
+            if b_def and 1 <= lvl <= len(b_def.get("levels", [])):
+                outputs.update(b_def["levels"][lvl - 1]["output_goods"])
+        province_category_counts[province.id] = counts
+        province_building_outputs[province.id] = outputs
+
+    # ------------------------------------------------------------------
+    # Collect active buildings.
+    # Tuple: (building, level_data, worker_capacity_factor, designation,
+    #         province_terrain, province_id)
+    # ------------------------------------------------------------------
+    active_buildings = []
+    total_needed = {}   # worker-adjusted input needs across all buildings
+
+    for province in provinces:
+        wf = province_job_status.get(province.id, {}).get("worker_capacity_factor", 1.0)
+        for building in province.buildings.all():
+            if not building.is_active or building.under_construction:
+                continue
+            b_def = BUILDING_TYPES.get(building.building_type)
+            if not b_def or not (1 <= building.level <= len(b_def["levels"])):
+                continue
+            level_data = b_def["levels"][building.level - 1]
+            designation = getattr(province, "designation", "rural")
+            active_buildings.append((
+                building, level_data, wf, designation,
+                province.terrain_type, province.id,
+            ))
+            for good, amount in level_data["input_goods"].items():
+                total_needed[good] = total_needed.get(good, 0) + amount * wf
+
+    if not active_buildings:
+        return
+
+    # ------------------------------------------------------------------
+    # Global input-goods capacity factor
+    # ------------------------------------------------------------------
+    def _available(good):
+        if good in _POOL_RESOURCE_KEYS:
+            return getattr(pool, good, 0.0)
+        return getattr(good_stock, good, 0.0)
+
+    input_capacity = 1.0
+    for good, needed in total_needed.items():
+        if needed > 0:
+            input_capacity = min(input_capacity, _available(good) / needed)
+    input_capacity = max(0.0, min(1.0, input_capacity))
+
+    # ------------------------------------------------------------------
+    # Process each building.
+    # output = amount × effective_capacity × designation_mult × efficiency_mult
+    # ------------------------------------------------------------------
+    pool_dirty = False
+    stock_dirty = False
+
+    for bldg, level_data, wf, designation, province_terrain, province_id in active_buildings:
+        effective_capacity = min(input_capacity, wf)
+        designation_mult = DESIGNATION_BUILDING_MODIFIER.get(designation, 1.0)
+        efficiency_mult = compute_building_efficiency(
+            bldg.building_type,
+            level_data,
+            province_terrain,
+            province_category_counts.get(province_id, {}),
+            province_building_outputs.get(province_id, set()),
+            building_efficiency_modifiers,
+        )
+
+        for good, amount in level_data["input_goods"].items():
+            deduct = round(amount * effective_capacity, 4)
+            if good in _POOL_RESOURCE_KEYS:
+                setattr(pool, good, max(0.0, getattr(pool, good, 0.0) - deduct))
+                pool_dirty = True
+            else:
+                setattr(good_stock, good, max(0.0, getattr(good_stock, good, 0.0) - deduct))
+                stock_dirty = True
+
+        for good, amount in level_data["output_goods"].items():
+            produce = round(amount * effective_capacity * designation_mult * efficiency_mult, 4)
+            if good in _POOL_RESOURCE_KEYS:
+                setattr(pool, good, round(getattr(pool, good, 0.0) + produce, 4))
+                pool_dirty = True
+            else:
+                setattr(good_stock, good, round(getattr(good_stock, good, 0.0) + produce, 4))
+                stock_dirty = True
+
+    if pool_dirty:
+        pool.save(update_fields=_POOL_RESOURCE_KEYS)
+    if stock_dirty:
+        good_stock.save()
+
+
+def simulate_good_consumption(nation, total_pop):
+    """
+    Deduct consumer goods per population and apply stability penalty on deficit.
+    """
+    from provinces.building_constants import CONSUMER_GOODS_PER_POP, CONSUMER_GOODS_DEFICIT_PENALTY
+    from .models import NationGoodStock, NationResourcePool
+
+    good_stock, _ = NationGoodStock.objects.get_or_create(nation=nation)
+    needed = total_pop * CONSUMER_GOODS_PER_POP
+    available = good_stock.consumer_goods
+
+    if needed <= 0:
+        return
+
+    deficit_ratio = max(0.0, (needed - available) / needed)
+    good_stock.consumer_goods = max(0.0, round(available - needed, 4))
+    good_stock.save()
+
+    if deficit_ratio > 0:
+        pool = NationResourcePool.objects.get(nation=nation)
+        penalty = deficit_ratio * CONSUMER_GOODS_DEFICIT_PENALTY
+        pool.stability = max(0.0, pool.stability - penalty)
+        pool.save(update_fields=["stability"])

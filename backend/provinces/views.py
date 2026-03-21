@@ -211,16 +211,12 @@ class BuildingView(APIView):
                     {"detail": "This building is already under construction."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if existing.level >= b_def["max_level"]:
-                return Response(
-                    {"detail": f"Building is already at max level ({b_def['max_level']})."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
             target_level = existing.level + 1
         else:
             target_level = 1
 
-        level_data = b_def["levels"][target_level - 1]
+        from provinces.building_constants import get_level_data
+        level_data = get_level_data(building_type, target_level)
         cost = level_data["construction_cost"]
 
         # Deduct construction cost from NationResourcePool

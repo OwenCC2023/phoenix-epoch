@@ -120,10 +120,13 @@ class TurnResolutionEngine:
             payload = order.payload
             nation = order.nation
             if payload["change_type"] == "government":
-                nation.government_type = payload["new_value"]
-                nation.save(update_fields=["government_type"])
+                component = payload["component"]   # e.g. "direction"
+                field = f"gov_{component}"         # e.g. "gov_direction"
+                new_value = payload["new_value"]
+                setattr(nation, field, new_value)
+                nation.save(update_fields=[field])
                 apply_government_modifiers(nation)
-                self._log(f"{nation.name} changed government to {payload['new_value']}")
+                self._log(f"{nation.name} changed gov_{component} to {new_value}")
             elif payload["change_type"] == "policy_level":
                 category = payload["category"]
                 new_level = payload["new_level"]

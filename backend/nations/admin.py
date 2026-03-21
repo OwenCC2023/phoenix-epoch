@@ -5,8 +5,17 @@ from .models import Nation, NationModifier, NationPolicy
 
 @admin.register(Nation)
 class NationAdmin(admin.ModelAdmin):
-    list_display = ("name", "game", "player", "government_type", "get_strong_trait", "is_alive")
-    list_filter = ("is_alive", "government_type")
+    list_display = (
+        "name", "game", "player",
+        "gov_direction", "gov_economic_category", "gov_structure",
+        "gov_power_origin", "gov_power_type",
+        "get_strong_trait", "is_alive",
+    )
+    list_filter = (
+        "is_alive",
+        "gov_direction", "gov_economic_category", "gov_structure",
+        "gov_power_origin", "gov_power_type",
+    )
     search_fields = ("name", "player__username")
 
     @admin.display(description="Strong Trait")

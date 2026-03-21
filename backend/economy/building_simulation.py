@@ -14,7 +14,7 @@ efficiency_mult    = 1.0 + sum(all efficiency bonuses below)
 
 Efficiency modifier sources (each is separately additive)
 ----------------------------------------------------------
-1. Government type  — GOVERNMENT_TYPES[gov]["building_efficiency"][category]
+1. Government components — combined building_efficiency from all five gov axes
 2. Trait bonuses    — building_efficiency_bonus from ideology traits
 3. GM crisis/boon   — NationModifier(category="building_efficiency", target=category_or_"all")
 4. Input co-location— province terrain primary resource is in building's input_goods (+INPUT_COLOCATION_BONUS)
@@ -110,9 +110,9 @@ def get_building_efficiency_modifiers(nation, turn_number):
     """
     Aggregate national building efficiency modifiers from three sources:
 
-      1. Government type  — GOVERNMENT_TYPES[gov]["building_efficiency"]
-      2. Trait bonuses    — building_efficiency_bonus from ideology traits
-      3. GM NationModifiers with category="building_efficiency"
+      1. Government components — combined building_efficiency from all five gov axes
+      2. Trait bonuses         — building_efficiency_bonus from ideology traits
+      3. GM NationModifiers    — with category="building_efficiency"
 
     Returns a flat dict mapping building category (or "all") → total bonus float.
     Example: {"heavy_manufacturing": 0.30, "financial": 0.22, "all": -0.15}
@@ -120,14 +120,20 @@ def get_building_efficiency_modifiers(nation, turn_number):
     Sources 4 (co-location) and 5 (concentration) are per-province and computed in
     compute_building_efficiency().
     """
-    from economy.constants import GOVERNMENT_TYPES
     from nations.helpers import get_nation_trait_effects
 
     merged = {}
 
-    # Source 1: government type
-    gov_def = GOVERNMENT_TYPES.get(nation.government_type, {})
-    for cat, bonus in gov_def.get("building_efficiency", {}).items():
+    # Source 1: government components (five-axis system)
+    from nations.government_constants import get_combined_government_effects
+    gov_effects = get_combined_government_effects(
+        nation.gov_direction,
+        nation.gov_economic_category,
+        nation.gov_structure,
+        nation.gov_power_origin,
+        nation.gov_power_type,
+    )
+    for cat, bonus in gov_effects.get("building_efficiency", {}).items():
         merged[cat] = merged.get(cat, 0.0) + bonus
 
     # Source 2: trait building_efficiency_bonus

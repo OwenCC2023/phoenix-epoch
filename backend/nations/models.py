@@ -7,7 +7,13 @@ class Nation(models.Model):
     player = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="nations")
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    government_type = models.CharField(max_length=30)
+    # Five-component government system. Each field holds a key from the
+    # corresponding GOV_* dict in nations.government_constants.
+    gov_direction = models.CharField(max_length=30, default="none")
+    gov_economic_category = models.CharField(max_length=30, default="subsistence")
+    gov_structure = models.CharField(max_length=30, default="power_consensus")
+    gov_power_origin = models.CharField(max_length=30, default="law_and_order")
+    gov_power_type = models.CharField(max_length=30, default="council")
     ideology_traits = models.JSONField(
         default=dict,
         help_text='{"strong": "trait_key", "weak": ["trait_key", "trait_key"]}',

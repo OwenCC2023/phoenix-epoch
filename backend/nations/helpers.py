@@ -17,7 +17,10 @@ def apply_government_modifiers(nation):
         f"Government: {nation.gov_direction}/{nation.gov_economic_category}/"
         f"{nation.gov_structure}/{nation.gov_power_origin}/{nation.gov_power_type}"
     )
-    _apply_modifier_set(nation, combined, NationModifier.Source.GOVERNMENT, label)
+    # Strip stub keys that have no NationModifier category mapping yet
+    active = {k: v for k, v in combined.items()
+              if k not in ("policy_effectiveness", "military_effectiveness")}
+    _apply_modifier_set(nation, active, NationModifier.Source.GOVERNMENT, label)
 
 
 def get_nation_trait_effects(nation):

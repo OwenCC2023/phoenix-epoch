@@ -377,15 +377,28 @@ def get_combined_government_effects(gov_direction, gov_economic_category,
     """
     Merge effects from all five government components into a single dict.
 
-    Numeric values (stability, growth, integration, etc.) are summed.
-    'production' sub-dicts are merged with summed values.
-    'building_efficiency' sub-dicts are merged with summed values.
-    'policy_effectiveness' and 'military_effectiveness' sub-dicts are merged
-    with summed values (for future wiring).
+    Stacking rules
+    --------------
+    Flat / rate values (stability, growth):
+        Summed additively.  These are absolute quantities, not multipliers.
 
-    Returns a dict with the same structure as a single component entry but with
-    all five components combined.
+    Scalar percentage bonuses (integration, trade, research, military, consumption):
+        Multiplied: combined = product(1 + bonus_i) − 1.
+        Diminishing returns on stacking; penalties also compound slightly less harshly.
+
+    Nested percentage dicts (production, building_efficiency,
+    policy_effectiveness, military_effectiveness):
+        Each sub-key is multiplied independently with the same formula.
+
+    The returned dict uses the same structure as individual component entries —
+    percentage keys hold net bonus fractions (combined multiplier − 1).
+    Downstream code adds 1.0 before applying (unchanged interface).
     """
+    _ADDITIVE_KEYS = {"stability", "growth"}
+    _SCALAR_PCT_KEYS = {"integration", "trade", "research", "military", "consumption"}
+    _NESTED_PCT_KEYS = {"production", "building_efficiency",
+                        "policy_effectiveness", "military_effectiveness"}
+
     components = [
         GOV_DIRECTION.get(gov_direction, {}),
         GOV_ECONOMIC_CATEGORY.get(gov_economic_category, {}),
@@ -395,13 +408,31 @@ def get_combined_government_effects(gov_direction, gov_economic_category,
     ]
 
     merged = {}
-    for comp in components:
-        for key, value in comp.items():
-            if isinstance(value, dict):
-                sub = merged.setdefault(key, {})
-                for subkey, subval in value.items():
-                    sub[subkey] = sub.get(subkey, 0.0) + subval
-            elif isinstance(value, (int, float)):
-                merged[key] = merged.get(key, 0) + value
+
+    # Flat / rate values: sum
+    for key in _ADDITIVE_KEYS:
+        total = sum(comp.get(key, 0) for comp in components)
+        if total:
+            merged[key] = total
+
+    # Scalar percentage: product(1 + bonus) − 1
+    for key in _SCALAR_PCT_KEYS:
+        factor = 1.0
+        for comp in components:
+            if key in comp:
+                factor *= (1.0 + comp[key])
+        net = factor - 1.0
+        if net:
+            merged[key] = net
+
+    # Nested percentage dicts: per-subkey product(1 + bonus) − 1
+    for key in _NESTED_PCT_KEYS:
+        sub_factors = {}
+        for comp in components:
+            for subkey, bonus in comp.get(key, {}).items():
+                sub_factors.setdefault(subkey, 1.0)
+                sub_factors[subkey] *= (1.0 + bonus)
+        if sub_factors:
+            merged[key] = {sk: f - 1.0 for sk, f in sub_factors.items()}
 
     return merged

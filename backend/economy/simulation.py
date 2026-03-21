@@ -33,6 +33,40 @@ def empty_resources():
     return {k: 0.0 for k in RESOURCE_KEYS}
 
 
+def _get_rationing_level(nation):
+    """Return the nation's rationing policy level (0 = no_rationing, 1-3 = priority)."""
+    from nations.models import NationPolicy
+    try:
+        policy = NationPolicy.objects.get(nation=nation, category="rationing")
+        return policy.current_level
+    except NationPolicy.DoesNotExist:
+        return 0
+
+
+def _compute_unit_needs(nation, trait_effects):
+    """
+    Compute total upkeep needs for all active military units in the nation,
+    with upkeep_reduction already applied.
+
+    Returns a dict of {good: total_amount} for use by the rationing system.
+    """
+    from provinces.military_constants import UNIT_TYPES
+    from provinces.models import MilitaryUnit
+
+    upkeep_reduction = min(0.75, trait_effects.get("military_upkeep_reduction", 0.0))
+    active_units = MilitaryUnit.objects.filter(
+        formation__nation=nation, quantity__gt=0
+    )
+    needs = {}
+    for unit in active_units:
+        unit_def = UNIT_TYPES.get(unit.unit_type, {})
+        upkeep = unit_def.get("upkeep", {})
+        scale = unit.quantity * (1.0 - upkeep_reduction)
+        for good, amount in upkeep.items():
+            needs[good] = needs.get(good, 0.0) + amount * scale
+    return needs
+
+
 def simulate_economy_for_game(game, turn_number):
     """Run the full economy simulation for all nations in a game."""
     from nations.models import Nation
@@ -353,7 +387,13 @@ def simulate_nation_economy(nation, turn_number):
     # Step 15: Building production (workers → manufactured goods)
     # Gather multi-source efficiency modifiers once per nation per turn.
     bldg_eff_mods = get_building_efficiency_modifiers(nation, turn_number)
-    simulate_building_production(nation, provinces, province_job_status, bldg_eff_mods)
+    rationing_level = _get_rationing_level(nation)
+    unit_upkeep_needs = _compute_unit_needs(nation, trait_effects)
+    simulate_building_production(
+        nation, provinces, province_job_status, bldg_eff_mods,
+        rationing_level=rationing_level,
+        unit_needs=unit_upkeep_needs,
+    )
 
     # Step 16: Consumer goods consumption (shortage → stability penalty)
     simulate_good_consumption(nation, total_pop_after)

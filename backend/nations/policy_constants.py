@@ -512,6 +512,40 @@ POLICY_CATEGORIES = {
             {"key": "enthusiastic_adoption", "name": "Enthusiastic Adoption", "description": "New technology is eagerly embraced.", "tags": ["modern", "progressive"], "effects": {}},
         ],
     },
+    "rationing": {
+        "name": "Rationing",
+        "default_level": 0,
+        "levels": [
+            {
+                "key": "no_rationing",
+                "name": "No Rationing",
+                "description": "All sectors compete for goods on equal terms. Shortages are shared proportionally across civilian, military, and government buildings, and military units.",
+                "tags": ["libertarian"],
+                "effects": {},
+            },
+            {
+                "key": "civilian_priority",
+                "name": "Civilian Priority",
+                "description": "Civilian production is fully served before military or government buildings receive inputs. Military units and government buildings share whatever remains, with units given priority within the military allocation.",
+                "tags": ["collectivist"],
+                "effects": {},
+            },
+            {
+                "key": "military_priority",
+                "name": "Military Priority",
+                "description": "Military is fully served first: units receive inputs before military buildings, then military buildings are served. Civilian and government buildings share whatever remains proportionally.",
+                "tags": ["militaristic", "authoritarian"],
+                "effects": {},
+            },
+            {
+                "key": "government_priority",
+                "name": "Government Priority",
+                "description": "Government infrastructure and services are fully served first. Civilian and military (units before buildings) share whatever remains proportionally.",
+                "tags": ["authoritarian"],
+                "effects": {},
+            },
+        ],
+    },
 
     # ===== CULTURE & IDENTITY (8 categories) =====
     "cultural_policy": {

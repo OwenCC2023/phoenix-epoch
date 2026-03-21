@@ -95,6 +95,112 @@ NATIONAL_EFFECT_KEYS = [
     "air_upkeep_reduction",         # fraction reduction in air unit upkeep
 ]
 
+# Sector classification for all building types.
+# Used by the rationing system to determine input-goods allocation priority.
+#   civilian   - production, extraction, healthcare, entertainment, religious, green energy
+#   military   - arms/weapons production, military bases, military education
+#   government - financial, transport, communications, all government_* categories
+BUILDING_SECTOR = {
+    # ----- Heavy manufacturing -----
+    "workshop":              "civilian",
+    "arms_factory":          "military",
+    "heavy_forge":           "civilian",
+    "industrial_complex":    "civilian",
+    "shipyard":              "civilian",
+    "weapons_factory":       "military",
+    # ----- Light manufacturing -----
+    "factory":               "civilian",
+    "textile_mill":          "civilian",
+    "electronics_factory":   "civilian",
+    "precision_workshop":    "civilian",
+    # ----- Refining -----
+    "refinery":              "civilian",
+    "advanced_refinery":     "civilian",
+    "fuel_depot":            "civilian",
+    "biofuel_plant":         "civilian",
+    # ----- Chemical -----
+    "chemical_plant":        "civilian",
+    "fertilizer_plant":      "civilian",
+    "plastics_factory":      "civilian",
+    # ----- Pharmaceutical -----
+    "pharmaceutical_lab":    "civilian",
+    "medical_supply_depot":  "civilian",
+    "research_institute":    "civilian",
+    # ----- Farming -----
+    "irrigation_network":    "civilian",
+    "grain_silo":            "civilian",
+    "agricultural_station":  "civilian",
+    # ----- Extraction -----
+    "mine":                  "civilian",
+    "oil_well":              "civilian",
+    "logging_camp":          "civilian",
+    # ----- Construction -----
+    "construction_yard":     "civilian",
+    "cement_plant":          "civilian",
+    "infrastructure_bureau": "civilian",
+    # ----- Financial -----
+    "trading_post":          "government",
+    "bank":                  "government",
+    "stock_exchange":        "government",
+    # ----- Transport -----
+    "road_network":          "government",
+    "railway_station":       "government",
+    "logistics_hub":         "government",
+    "dock":                  "government",
+    "port":                  "government",
+    "bridge":                "government",
+    "railroad":              "government",
+    "train_depot":           "government",
+    "train_station":         "government",
+    "train_cargo_terminal":  "government",
+    "airport":               "government",
+    "air_cargo_terminal":    "government",
+    # ----- Communications -----
+    "radio_tower":           "government",
+    "telegraph_network":     "government",
+    "broadcasting_station":  "government",
+    # ----- Entertainment -----
+    "tavern":                "civilian",
+    "theatre":               "civilian",
+    "resort":                "civilian",
+    # ----- Healthcare -----
+    "clinic":                "civilian",
+    "hospital":              "civilian",
+    "sanitation_works":      "civilian",
+    # ----- Religious -----
+    "church":                "civilian",
+    "madrasa":               "civilian",
+    "holy_site":             "civilian",
+    # ----- Green energy -----
+    "wind_farm":             "civilian",
+    "solar_array":           "civilian",
+    "hydroelectric_dam":     "civilian",
+    # ----- Government regulatory/oversight/management/security -----
+    "regulatory_office":     "government",
+    "standards_bureau":      "government",
+    "inspector_general":     "government",
+    "audit_commission":      "government",
+    "civil_service_academy": "government",
+    "administrative_center": "government",
+    "police_headquarters":   "government",
+    "intelligence_agency":   "government",
+    # ----- Government education -----
+    "public_school":         "government",
+    "university":            "government",
+    # ----- Government organization/welfare -----
+    "labor_bureau":          "government",
+    "workers_council":       "government",
+    "social_services_office": "government",
+    "public_housing":        "government",
+    # ----- Military bases and education -----
+    "army_base":             "military",
+    "naval_base":            "military",
+    "air_base":              "military",
+    "military_academy":      "military",
+    "naval_war_college":     "military",
+    "air_force_academy":     "military",
+}
+
 
 def get_level_data(building_type: str, level: int) -> dict:
     """

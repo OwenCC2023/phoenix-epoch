@@ -233,10 +233,184 @@ def compute_building_efficiency(
 
 
 # ---------------------------------------------------------------------------
+# Rationing — per-sector input-goods capacity allocation
+# ---------------------------------------------------------------------------
+
+def compute_rationing_capacities(
+    civilian_needs,
+    mil_building_needs,
+    government_needs,
+    unit_needs,
+    pool,
+    good_stock,
+    rationing_level,
+):
+    """
+    Compute per-sector building capacity factors based on the rationing policy.
+
+    The priority sector is served first from the available pool; remaining
+    sectors share what is left proportionally.  Within the military sector,
+    units are always served before military buildings (under any rationing
+    level other than no_rationing).
+
+    Under no_rationing all consumers — buildings and units — compete for the
+    same pool on equal terms (a single shared capacity factor).
+
+    Parameters
+    ----------
+    civilian_needs / mil_building_needs / government_needs : dict[str, float]
+        Total input-goods needs (good → amount) for each building sector,
+        aggregated with worker_capacity_factor already applied.
+    unit_needs : dict[str, float]
+        Total upkeep needs (good → amount) for all active military units.
+    pool : NationResourcePool
+    good_stock : NationGoodStock
+    rationing_level : int
+        0 = no_rationing, 1 = civilian_priority,
+        2 = military_priority, 3 = government_priority
+
+    Returns
+    -------
+    dict with keys:
+        civilian_cap : float          (0.0–1.0)
+        military_building_cap : float (0.0–1.0)
+        government_cap : float        (0.0–1.0)
+        unit_cap : float              (0.0–1.0, informational)
+    """
+    # Build available-goods snapshot
+    available = {g: getattr(pool, g, 0.0) for g in _POOL_RESOURCE_KEYS}
+    from provinces.building_constants import GOOD_KEYS
+    for g in GOOD_KEYS:
+        available[g] = getattr(good_stock, g, 0.0)
+
+    def _cap(needs, avail):
+        """Min-ratio capacity factor for a needs dict against an available dict."""
+        cap = 1.0
+        for g, n in needs.items():
+            if n > 0:
+                cap = min(cap, avail.get(g, 0.0) / n)
+        return max(0.0, cap)
+
+    def _combined(*needs_dicts):
+        combined = {}
+        for needs in needs_dicts:
+            for g, n in needs.items():
+                combined[g] = combined.get(g, 0.0) + n
+        return combined
+
+    def _deduct(avail, needs, cap):
+        remaining = dict(avail)
+        for g, n in needs.items():
+            remaining[g] = max(0.0, remaining.get(g, 0.0) - n * cap)
+        return remaining
+
+    def _proportional_mil_caps(mil_remaining):
+        """Given military's allocated goods, compute unit_cap then mil_building_cap."""
+        uc = min(1.0, _cap(unit_needs, mil_remaining))
+        after_units = _deduct(mil_remaining, unit_needs, uc)
+        mbc = min(1.0, _cap(mil_building_needs, after_units))
+        return uc, mbc
+
+    def _mil_share(avail):
+        """Compute each good's proportional share for the military sector."""
+        mil_total = _combined(mil_building_needs, unit_needs)
+        sharing = {}
+        for g in set(list(mil_total.keys()) + list(avail.keys())):
+            mt = mil_total.get(g, 0.0)
+            all_sharing = mt + government_needs.get(g, 0.0)
+            if all_sharing > 0:
+                sharing[g] = avail.get(g, 0.0) * (mt / all_sharing)
+            else:
+                sharing[g] = 0.0
+        return sharing
+
+    if rationing_level == 0:  # no_rationing — single shared cap for all
+        total = _combined(civilian_needs, mil_building_needs, government_needs, unit_needs)
+        cap = min(1.0, _cap(total, available))
+        return {
+            "civilian_cap": cap,
+            "military_building_cap": cap,
+            "government_cap": cap,
+            "unit_cap": cap,
+        }
+
+    if rationing_level == 1:  # civilian_priority
+        civ_cap = min(1.0, _cap(civilian_needs, available))
+        remaining = _deduct(available, civilian_needs, civ_cap)
+
+        # Military and government share remainder proportionally
+        mil_gov_total = _combined(mil_building_needs, unit_needs, government_needs)
+        joint_cap = min(1.0, _cap(mil_gov_total, remaining))
+
+        # Within military's proportional allocation: units first, then buildings
+        mil_total = _combined(mil_building_needs, unit_needs)
+        mil_alloc = {}
+        for g in set(list(mil_total.keys()) + list(remaining.keys())):
+            mg = mil_gov_total.get(g, 0.0)
+            if mg > 0:
+                mil_alloc[g] = remaining.get(g, 0.0) * (mil_total.get(g, 0.0) / mg)
+            else:
+                mil_alloc[g] = 0.0
+        uc, mbc = _proportional_mil_caps(mil_alloc)
+
+        return {
+            "civilian_cap": civ_cap,
+            "military_building_cap": mbc,
+            "government_cap": joint_cap,
+            "unit_cap": uc,
+        }
+
+    if rationing_level == 2:  # military_priority — units first, then military buildings
+        uc = min(1.0, _cap(unit_needs, available))
+        after_units = _deduct(available, unit_needs, uc)
+        mbc = min(1.0, _cap(mil_building_needs, after_units))
+        after_mil = _deduct(after_units, mil_building_needs, mbc)
+
+        # Civilian and government share remainder proportionally
+        civ_gov_total = _combined(civilian_needs, government_needs)
+        joint_cap = min(1.0, _cap(civ_gov_total, after_mil))
+
+        return {
+            "civilian_cap": joint_cap,
+            "military_building_cap": mbc,
+            "government_cap": joint_cap,
+            "unit_cap": uc,
+        }
+
+    # rationing_level == 3 — government_priority
+    gov_cap = min(1.0, _cap(government_needs, available))
+    remaining = _deduct(available, government_needs, gov_cap)
+
+    # Civilian and military (units then buildings) share remainder proportionally
+    mil_total = _combined(mil_building_needs, unit_needs)
+    civ_mil_total = _combined(civilian_needs, mil_total)
+    joint_cap = min(1.0, _cap(civ_mil_total, remaining))
+
+    mil_alloc = {}
+    for g in set(list(mil_total.keys()) + list(remaining.keys())):
+        cm = civ_mil_total.get(g, 0.0)
+        if cm > 0:
+            mil_alloc[g] = remaining.get(g, 0.0) * (mil_total.get(g, 0.0) / cm)
+        else:
+            mil_alloc[g] = 0.0
+    uc, mbc = _proportional_mil_caps(mil_alloc)
+
+    return {
+        "civilian_cap": joint_cap,
+        "military_building_cap": mbc,
+        "government_cap": gov_cap,
+        "unit_cap": uc,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main production functions
 # ---------------------------------------------------------------------------
 
-def simulate_building_production(nation, provinces, province_job_status, building_efficiency_modifiers):
+def simulate_building_production(
+    nation, provinces, province_job_status, building_efficiency_modifiers,
+    rationing_level=0, unit_needs=None,
+):
     """
     Process manufactured-goods production for all buildings in a nation.
 
@@ -258,12 +432,22 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
     building_efficiency_modifiers : dict
         Pre-computed national efficiency modifiers from get_building_efficiency_modifiers().
         Pass an empty dict if callers do not need the modifier system.
+    rationing_level : int
+        0 = no_rationing (default), 1 = civilian_priority,
+        2 = military_priority, 3 = government_priority.
+    unit_needs : dict[str, float] or None
+        Total upkeep needs of all active military units this turn
+        (good → amount, with upkeep_reduction already applied).
+        Pass None or {} if there are no units or rationing is unused.
     """
-    from provinces.building_constants import BUILDING_TYPES, get_level_data
+    from provinces.building_constants import BUILDING_TYPES, BUILDING_SECTOR, get_level_data
     from .models import NationGoodStock, NationResourcePool
 
     pool = NationResourcePool.objects.get(nation=nation)
     good_stock, _ = NationGoodStock.objects.get_or_create(nation=nation)
+
+    if unit_needs is None:
+        unit_needs = {}
 
     # ------------------------------------------------------------------
     # Pre-compute per-province snapshots for efficiency bonuses.
@@ -291,12 +475,12 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
         province_building_outputs[province.id] = outputs
 
     # ------------------------------------------------------------------
-    # Collect active buildings.
+    # Collect active buildings, split input needs by sector.
     # Tuple: (building, level_data, worker_capacity_factor, designation,
-    #         province_terrain, province_id)
+    #         province_terrain, province_id, sector)
     # ------------------------------------------------------------------
     active_buildings = []
-    total_needed = {}   # worker-adjusted input needs across all buildings
+    sector_needed = {"civilian": {}, "military": {}, "government": {}}
 
     for province in provinces:
         wf = province_job_status.get(province.id, {}).get("worker_capacity_factor", 1.0)
@@ -307,29 +491,30 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
                 continue
             level_data = get_level_data(building.building_type, building.level)
             designation = getattr(province, "designation", "rural")
+            sector = BUILDING_SECTOR.get(building.building_type, "civilian")
             active_buildings.append((
                 building, level_data, wf, designation,
-                province.terrain_type, province.id,
+                province.terrain_type, province.id, sector,
             ))
+            s_needs = sector_needed[sector]
             for good, amount in level_data["input_goods"].items():
-                total_needed[good] = total_needed.get(good, 0) + amount * wf
+                s_needs[good] = s_needs.get(good, 0) + amount * wf
 
     if not active_buildings:
         return
 
     # ------------------------------------------------------------------
-    # Global input-goods capacity factor
+    # Compute per-sector capacity factors via rationing policy.
     # ------------------------------------------------------------------
-    def _available(good):
-        if good in _POOL_RESOURCE_KEYS:
-            return getattr(pool, good, 0.0)
-        return getattr(good_stock, good, 0.0)
-
-    input_capacity = 1.0
-    for good, needed in total_needed.items():
-        if needed > 0:
-            input_capacity = min(input_capacity, _available(good) / needed)
-    input_capacity = max(0.0, min(1.0, input_capacity))
+    rationing_caps = compute_rationing_capacities(
+        civilian_needs=sector_needed["civilian"],
+        mil_building_needs=sector_needed["military"],
+        government_needs=sector_needed["government"],
+        unit_needs=unit_needs,
+        pool=pool,
+        good_stock=good_stock,
+        rationing_level=rationing_level,
+    )
 
     # ------------------------------------------------------------------
     # Process each building.
@@ -338,8 +523,15 @@ def simulate_building_production(nation, provinces, province_job_status, buildin
     pool_dirty = False
     stock_dirty = False
 
-    for bldg, level_data, wf, designation, province_terrain, province_id in active_buildings:
-        effective_capacity = min(input_capacity, wf)
+    _sector_cap_key = {
+        "civilian":   "civilian_cap",
+        "military":   "military_building_cap",
+        "government": "government_cap",
+    }
+
+    for bldg, level_data, wf, designation, province_terrain, province_id, sector in active_buildings:
+        sector_cap = rationing_caps[_sector_cap_key[sector]]
+        effective_capacity = min(sector_cap, wf)
         designation_mult = DESIGNATION_BUILDING_MODIFIER.get(designation, 1.0)
         efficiency_mult = compute_building_efficiency(
             bldg.building_type,

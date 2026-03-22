@@ -124,8 +124,12 @@ def _validate_trade_response(order):
 
 def _validate_policy_change(order):
     """Validate policy change order.
-    Payload for government: {"change_type": "government", "new_value": str}
-    Payload for policy:     {"change_type": "policy_level", "category": str, "new_level": int}
+    Payload for government component:
+        {"change_type": "government", "component": str, "new_value": str}
+        where component is one of: direction, economic_category, structure,
+        power_origin, power_type.
+    Payload for policy:
+        {"change_type": "policy_level", "category": str, "new_level": int}
     """
     errors = []
     payload = order.payload
@@ -137,10 +141,18 @@ def _validate_policy_change(order):
         return errors
 
     if change_type == "government":
+        from nations.government_constants import GOV_COMPONENTS
+        component = payload.get("component")
         new_value = payload.get("new_value")
-        from economy.constants import GOVERNMENT_TYPES
-        if new_value not in GOVERNMENT_TYPES:
-            errors.append(f"Invalid government type: {new_value}")
+        if component not in GOV_COMPONENTS:
+            valid = ", ".join(GOV_COMPONENTS.keys())
+            errors.append(f"Invalid government component '{component}'. Choose from: {valid}")
+        elif new_value not in GOV_COMPONENTS[component]:
+            valid = ", ".join(GOV_COMPONENTS[component].keys())
+            errors.append(
+                f"Invalid value '{new_value}' for component '{component}'. "
+                f"Choose from: {valid}"
+            )
     elif change_type == "policy_level":
         from nations.policy_constants import POLICY_CATEGORIES
         category = payload.get("category")

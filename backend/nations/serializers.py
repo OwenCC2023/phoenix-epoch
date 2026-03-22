@@ -31,7 +31,11 @@ class NationSerializer(serializers.ModelSerializer):
             "player",
             "name",
             "description",
-            "government_type",
+            "gov_direction",
+            "gov_economic_category",
+            "gov_structure",
+            "gov_power_origin",
+            "gov_power_type",
             "ideology_traits",
             "motto",
             "is_alive",
@@ -45,17 +49,42 @@ class NationSerializer(serializers.ModelSerializer):
 class NationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Nation
-        fields = ["name", "description", "government_type", "ideology_traits", "motto"]
+        fields = [
+            "name",
+            "description",
+            "gov_direction",
+            "gov_economic_category",
+            "gov_structure",
+            "gov_power_origin",
+            "gov_power_type",
+            "ideology_traits",
+            "motto",
+        ]
 
-    def validate_government_type(self, value):
-        from economy.constants import GOVERNMENT_TYPES
-
-        if value not in GOVERNMENT_TYPES:
-            valid = ", ".join(GOVERNMENT_TYPES.keys())
+    def _validate_gov_component(self, component_key, value):
+        from nations.government_constants import GOV_COMPONENTS
+        options = GOV_COMPONENTS[component_key]
+        if value not in options:
+            valid = ", ".join(options.keys())
             raise serializers.ValidationError(
-                f"Invalid government type. Choose from: {valid}"
+                f"Invalid value '{value}'. Choose from: {valid}"
             )
         return value
+
+    def validate_gov_direction(self, value):
+        return self._validate_gov_component("direction", value)
+
+    def validate_gov_economic_category(self, value):
+        return self._validate_gov_component("economic_category", value)
+
+    def validate_gov_structure(self, value):
+        return self._validate_gov_component("structure", value)
+
+    def validate_gov_power_origin(self, value):
+        return self._validate_gov_component("power_origin", value)
+
+    def validate_gov_power_type(self, value):
+        return self._validate_gov_component("power_type", value)
 
     def validate_ideology_traits(self, value):
         if not isinstance(value, dict):

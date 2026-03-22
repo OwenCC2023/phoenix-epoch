@@ -3,11 +3,24 @@ from .trait_constants import get_effective_trait_effects
 
 
 def apply_government_modifiers(nation):
-    """Create NationModifier entries based on government type."""
-    from economy.constants import GOVERNMENT_TYPES
+    """Create NationModifier entries based on the five government components."""
+    from .government_constants import get_combined_government_effects
 
-    govt = GOVERNMENT_TYPES.get(nation.government_type, {})
-    _apply_modifier_set(nation, govt, NationModifier.Source.GOVERNMENT, f"Government: {nation.government_type}")
+    combined = get_combined_government_effects(
+        nation.gov_direction,
+        nation.gov_economic_category,
+        nation.gov_structure,
+        nation.gov_power_origin,
+        nation.gov_power_type,
+    )
+    label = (
+        f"Government: {nation.gov_direction}/{nation.gov_economic_category}/"
+        f"{nation.gov_structure}/{nation.gov_power_origin}/{nation.gov_power_type}"
+    )
+    # Strip stub keys that have no NationModifier category mapping yet
+    active = {k: v for k, v in combined.items()
+              if k not in ("policy_effectiveness", "military_effectiveness")}
+    _apply_modifier_set(nation, active, NationModifier.Source.GOVERNMENT, label)
 
 
 def get_nation_trait_effects(nation):

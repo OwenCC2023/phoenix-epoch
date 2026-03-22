@@ -155,6 +155,19 @@ def _validate_policy_change(order):
 
         if not isinstance(new_level, int) or new_level < 0 or new_level >= num_levels:
             errors.append(f"Invalid level {new_level} for {category} (0-{num_levels - 1})")
+            return errors
+
+        # Check policy requirements, bans, and cross-policy conflicts
+        from nations.models import Nation
+        try:
+            nation = Nation.objects.get(pk=order.nation_id)
+        except Nation.DoesNotExist:
+            errors.append("Nation not found")
+            return errors
+
+        from nations.policy_effects import validate_policy_change
+        policy_errors = validate_policy_change(nation, category, new_level)
+        errors.extend(policy_errors)
 
     return errors
 

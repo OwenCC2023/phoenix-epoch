@@ -170,6 +170,24 @@ class BuildingView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Policy-based building blocks
+        from nations.policy_effects import get_policy_building_blocks
+        blocked_buildings = get_policy_building_blocks(province.nation)
+        if building_type in blocked_buildings:
+            return Response(
+                {"detail": f"Your nation's current policies prevent constructing {b_def['label']}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Trait-based building restrictions
+        from nations.helpers import get_nation_trait_effects
+        trait_fx = get_nation_trait_effects(province.nation)
+        if building_type in trait_fx.get("building_restrictions", []):
+            return Response(
+                {"detail": f"Your nation's ideology traits prevent constructing {b_def['label']}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Placement restrictions
         if building_type in ("dock", "port") and not province.is_coastal:
             return Response(

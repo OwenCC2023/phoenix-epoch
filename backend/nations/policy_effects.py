@@ -31,7 +31,13 @@ def get_nation_policy_effects(nation):
     """
     from .models import NationPolicy
 
-    gov_type = nation.government_type
+    gov_values = {
+        nation.gov_direction,
+        nation.gov_economic_category,
+        nation.gov_structure,
+        nation.gov_power_origin,
+        nation.gov_power_type,
+    }
 
     # Collect the nation's trait keys (strong + weak)
     traits = nation.ideology_traits or {}
@@ -59,10 +65,11 @@ def get_nation_policy_effects(nation):
         # Layer 1: base effects
         _merge_into(merged, level_effects.get("base", {}))
 
-        # Layer 2: government modifiers
+        # Layer 2: government modifiers — applies all matching axis values
         gov_mods = level_effects.get("government_modifiers", {})
-        if gov_type in gov_mods:
-            _merge_into(merged, gov_mods[gov_type])
+        for axis_val, mods in gov_mods.items():
+            if axis_val in gov_values:
+                _merge_into(merged, mods)
 
         # Layer 3: trait modifiers (all matching traits)
         trait_mods = level_effects.get("trait_modifiers", {})
@@ -94,12 +101,25 @@ def validate_policy_change(nation, category, new_level):
     """
     Check POLICY_REQUIREMENTS and POLICY_BANS for a proposed policy change.
 
+    POLICY_REQUIREMENTS keys:
+      ``gov_axis_required``   — nation must have at least one of these axis values
+      ``gov_axis_banned``     — nation must not have any of these axis values
+      ``traits_required``     — nation must have at least one of these traits
+      ``traits_banned``       — nation must not have any of these traits
+      ``policies_required``   — list of (category, min_level) tuples
+
     Returns a list of error strings.  Empty list means the change is valid.
     """
     from .models import NationPolicy
 
     errors = []
-    gov_type = nation.government_type
+    gov_values = {
+        nation.gov_direction,
+        nation.gov_economic_category,
+        nation.gov_structure,
+        nation.gov_power_origin,
+        nation.gov_power_type,
+    }
 
     # Collect nation's trait keys
     traits = nation.ideology_traits or {}
@@ -113,19 +133,20 @@ def validate_policy_change(nation, category, new_level):
     # Check requirements for the target level
     req = POLICY_REQUIREMENTS.get((category, new_level))
     if req:
-        # Government type checks
-        allowed = req.get("government_types")
-        if allowed and gov_type not in allowed:
+        # Government axis checks
+        required = req.get("gov_axis_required")
+        if required and not gov_values.intersection(required):
             errors.append(
-                f"Policy {category} level {new_level} requires government type: "
-                f"{', '.join(allowed)}"
+                f"Policy {category} level {new_level} requires one of "
+                f"government axis values: {', '.join(required)}"
             )
 
-        banned = req.get("government_types_banned")
-        if banned and gov_type in banned:
+        banned = req.get("gov_axis_banned")
+        if banned and gov_values.intersection(banned):
+            bad = gov_values.intersection(banned)
             errors.append(
                 f"Policy {category} level {new_level} is banned for "
-                f"government type {gov_type}"
+                f"government axis values: {', '.join(bad)}"
             )
 
         # Trait checks

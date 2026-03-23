@@ -36,12 +36,14 @@ provinces/travel_constants.py    — travel speed constants, cross-type requirem
 provinces/travel.py              — get_march_time(), get_embark_time(), get_zone_travel_time(), check_cross_type_requirements()
 economy/constants.py             — FOOD_CONSUMPTION_PER_POP, stability penalties, government types
 nations/trait_constants.py       — 18 ideology traits in 9 pairs, trait effects, validation
-nations/policy_constants.py      — 66 policy categories with discrete levels
+nations/policy_constants.py      — 66 policy categories, POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, building/unit blocks
+nations/policy_effects.py        — get_nation_policy_effects(), validate_policy_change(), get_policy_building_blocks(), get_policy_unit_blocks()
+nations/government_constants.py  — five-axis GOV_* dicts, GOV_COMPONENTS, get_combined_government_effects()
 ```
 
 ---
 
-## Systems built (as of 2026-03-20)
+## Systems built (as of 2026-03-22)
 
 ### 1. Buildings system
 
@@ -220,13 +222,51 @@ Construction cost (all three, L1/L2/L3): ~5000 materials + 4000–16000 wealth; 
 **What:** 66 policy categories, each with 2-10 discrete levels. One row per (nation, category) in `NationPolicy` model.
 
 **Key files:**
-- `nations/policy_constants.py` — `POLICY_CATEGORIES` dict with all levels
+- `nations/policy_constants.py` — `POLICY_CATEGORIES`, `POLICY_EFFECTS`, `POLICY_REQUIREMENTS`, `POLICY_BANS`, `BUILDING_POLICY_REQUIREMENTS`, `BUILDING_POLICY_BANS`, `UNIT_POLICY_REQUIREMENTS`, `UNIT_POLICY_BANS`
+- `nations/policy_effects.py` — `get_nation_policy_effects()`, `validate_policy_change()`, `get_policy_building_blocks()`, `get_policy_unit_blocks()`
 - `nations/models.py` — `NationPolicy` model
 - `nations/helpers.py` — `create_default_policies(nation)` bulk-creates defaults on nation creation
 
-**Policy changes:** Submitted as orders via `policy_change` order type with `change_type: "policy_level"`, `category`, and `new_level`. Validated in `turns/validators.py`, executed in `turns/engine.py`.
+**Policy changes:** Submitted as orders via `policy_change` order type with `change_type: "policy_level"`, `category`, and `new_level`. Validated in `turns/validators.py` (calls `validate_policy_change()`), executed in `turns/engine.py`.
 
-**Policy effects:** Currently stubs (empty `effects` dicts). Designed to be wired into simulation as systems are built.
+**Policy effects — fully wired.** `get_nation_policy_effects(nation)` merges active policy effects into a flat dict using a three-layer system:
+
+1. **`base`** — unconditional numeric effects applied to all nations at that policy level
+2. **`government_modifiers`** — keyed by five-axis government values (see below); all matching axis values are applied additively
+3. **`trait_modifiers`** — keyed by ideology trait; all matching nation traits are applied additively
+
+**Five-axis government_modifiers keys:** The Nation model has five orthogonal government fields. `government_modifiers` keys in `POLICY_EFFECTS` must use valid axis values from one of these five axes:
+
+| Axis field | Valid values |
+|-----------|-------------|
+| `gov_direction` | `top_down`, `bottom_up`, `none` |
+| `gov_economic_category` | `liberal`, `collectivist`, `protectionist`, `resource`, `autarkic`, `subsistence` |
+| `gov_structure` | `hereditary`, `power_consensus`, `federal`, `representative`, `direct` |
+| `gov_power_origin` | `elections`, `economic_success`, `law_and_order`, `military_power`, `religious`, `ideology` |
+| `gov_power_type` | `singular`, `council`, `large_body`, `multi_body`, `staggered_groups` |
+
+A nation can match multiple `government_modifiers` keys simultaneously (e.g., `collectivist` economy + `elections` origin both fire if present). This is intentional. When adding new `government_modifiers` entries, **never use old legacy type names** (`junta`, `democracy`, `autocracy`, etc.) — they will silently never match.
+
+**Legacy type → axis value mapping (for reference):**
+`democracy→elections`, `autocracy→singular`, `junta→military_power`, `commune→collectivist`, `tribal→subsistence`, `theocracy→religious`, `corporate→liberal`
+
+**Effect keys wired into simulation** (`economy/simulation.py`):
+- `stability_bonus/penalty` — flat national stability
+- `growth_bonus/penalty` — per-month growth rate
+- `integration_bonus` — stacks with base integration efficiency
+- `research_bonus/penalty`, `manpower_bonus`, `wealth_production_bonus`, `food_production_bonus`
+- `upkeep_reduction` — fraction reduction in government upkeep
+- `building_efficiency_bonus` — dict of building category → bonus (source 2b in efficiency system, applied in `building_simulation.py`)
+- `army_training_speed_bonus`, `navy_training_speed_bonus`, `air_training_speed_bonus` — stub keys (wired when military sim built)
+- `army_upkeep_reduction`, `navy_upkeep_reduction`, `air_upkeep_reduction` — stub keys
+
+**`POLICY_REQUIREMENTS`:** Gates which nations may select a given level. Keys: `gov_axis_required` (must have at least one of these axis values), `gov_axis_banned` (must not have any), `traits_required`, `traits_banned`, `policies_required`.
+
+**`POLICY_BANS`:** Cross-policy incompatibilities. When a nation has `(cat, level)`, the listed `(cat, level)` pairs become unavailable.
+
+**`BUILDING_POLICY_REQUIREMENTS` / `BUILDING_POLICY_BANS`:** `get_policy_building_blocks(nation)` returns the set of building types blocked by current policies. Called in `provinces/views.py BuildingView.post` before allowing construction.
+
+**`UNIT_POLICY_REQUIREMENTS` / `UNIT_POLICY_BANS`:** `get_policy_unit_blocks(nation)` returns the set of unit types blocked. Called in `turns/validators.py _validate_train_unit` (stub — integrate when military sim is built).
 
 ### 2. Construction system
 

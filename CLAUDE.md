@@ -36,6 +36,7 @@ provinces/travel_constants.py    — travel speed constants, cross-type requirem
 provinces/travel.py              — get_march_time(), get_embark_time(), get_zone_travel_time(), check_cross_type_requirements()
 economy/constants.py             — FOOD_CONSUMPTION_PER_POP, stability penalties, government types
 nations/trait_constants.py       — 18 ideology traits in 9 pairs, trait effects, validation
+nations/government_constants.py  — five-axis GOV_* dicts, GOV_COMPONENTS, get_combined_government_effects()
 nations/policy_constants.py      — 67 policy categories with discrete levels + POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, BUILDING_POLICY_REQUIREMENTS, BUILDING_POLICY_BANS, UNIT_POLICY_REQUIREMENTS, UNIT_POLICY_BANS
 nations/policy_effects.py        — get_nation_policy_effects(), validate_policy_change(), get_policy_building_blocks(), get_policy_unit_blocks()
 ```
@@ -222,64 +223,51 @@ Construction cost (all three, L1/L2/L3): ~5000 materials + 4000–16000 wealth; 
 **What:** 67 policy categories, each with 2-10 discrete levels. One row per (nation, category) in `NationPolicy` model. Policy effects are fully wired into the simulation and building system.
 
 **Key files:**
-- `nations/policy_constants.py` — `POLICY_CATEGORIES` (level definitions), `POLICY_EFFECTS` (context-dependent effects), `POLICY_REQUIREMENTS`, `POLICY_BANS`, `BUILDING_POLICY_REQUIREMENTS`, `BUILDING_POLICY_BANS`, `UNIT_POLICY_REQUIREMENTS`, `UNIT_POLICY_BANS`
-- `nations/policy_effects.py` — helper functions (see below)
+- `nations/policy_constants.py` — `POLICY_CATEGORIES`, `POLICY_EFFECTS`, `POLICY_REQUIREMENTS`, `POLICY_BANS`, `BUILDING_POLICY_REQUIREMENTS`, `BUILDING_POLICY_BANS`, `UNIT_POLICY_REQUIREMENTS`, `UNIT_POLICY_BANS`
+- `nations/policy_effects.py` — `get_nation_policy_effects()`, `validate_policy_change()`, `get_policy_building_blocks()`, `get_policy_unit_blocks()`
 - `nations/models.py` — `NationPolicy` model
 - `nations/helpers.py` — `create_default_policies(nation)` bulk-creates defaults on nation creation
 
-**Policy changes:** Submitted as orders via `policy_change` order type with `change_type: "policy_level"`, `category`, and `new_level`. Validated in `turns/validators.py`, executed in `turns/engine.py`.
+**Policy changes:** Submitted as orders via `policy_change` order type with `change_type: "policy_level"`, `category`, and `new_level`. Validated in `turns/validators.py` (calls `validate_policy_change()`), executed in `turns/engine.py`.
 
-**POLICY_EFFECTS structure** — each `(category, level)` entry has three optional layers:
-```python
-{
-    "base": {<effect_key>: <value>, ...},
-    "government_modifiers": {<gov_type>: {<effect_key>: <value>, ...}, ...},
-    "trait_modifiers": {<trait_key>: {<effect_key>: <value>, ...}, ...},
-}
-```
-All numeric values are additive. `building_efficiency_bonus` values are dicts (`category → bonus`) merged by category key. Merge order: base → government_modifiers (matching gov_type) → trait_modifiers (all matching traits).
+**Policy effects — fully wired.** `get_nation_policy_effects(nation)` merges active policy effects into a flat dict using a three-layer system:
 
-**Policy effect keys wired into simulation** (`economy/simulation.py`):
-- `stability_bonus/penalty` — flat national stability adjustment
-- `growth_bonus/penalty` — per-month population growth rate
+1. **`base`** — unconditional numeric effects applied to all nations at that policy level
+2. **`government_modifiers`** — keyed by five-axis government values (see below); all matching axis values are applied additively
+3. **`trait_modifiers`** — keyed by ideology trait; all matching nation traits are applied additively
+
+**Five-axis government_modifiers keys:** The Nation model has five orthogonal government fields. `government_modifiers` keys in `POLICY_EFFECTS` must use valid axis values from one of these five axes:
+
+| Axis field | Valid values |
+|-----------|-------------|
+| `gov_direction` | `top_down`, `bottom_up`, `none` |
+| `gov_economic_category` | `liberal`, `collectivist`, `protectionist`, `resource`, `autarkic`, `subsistence` |
+| `gov_structure` | `hereditary`, `power_consensus`, `federal`, `representative`, `direct` |
+| `gov_power_origin` | `elections`, `economic_success`, `law_and_order`, `military_power`, `religious`, `ideology` |
+| `gov_power_type` | `singular`, `council`, `large_body`, `multi_body`, `staggered_groups` |
+
+A nation can match multiple `government_modifiers` keys simultaneously (e.g., `collectivist` economy + `elections` origin both fire if present). This is intentional. When adding new `government_modifiers` entries, **never use old legacy type names** (`junta`, `democracy`, `autocracy`, etc.) — they will silently never match.
+
+**Legacy type → axis value mapping (for reference):**
+`democracy→elections`, `autocracy→singular`, `junta→military_power`, `commune→collectivist`, `tribal→subsistence`, `theocracy→religious`, `corporate→liberal`
+
+**Effect keys wired into simulation** (`economy/simulation.py`):
+- `stability_bonus/penalty` — flat national stability
+- `growth_bonus/penalty` — per-month growth rate
 - `integration_bonus` — stacks with base integration efficiency
-- `research_bonus/penalty` — percentage modifier on research production
-- `manpower_bonus` — percentage modifier on manpower production
-- `wealth_production_bonus` — percentage modifier on wealth production
-- `food_production_bonus` — percentage modifier on food production
+- `research_bonus/penalty`, `manpower_bonus`, `wealth_production_bonus`, `food_production_bonus`
 - `upkeep_reduction` — fraction reduction in government upkeep
-- `building_efficiency_bonus` — dict of building category → bonus (wired into efficiency system as source 2b)
+- `building_efficiency_bonus` — dict of building category → bonus (source 2b in efficiency system, applied in `building_simulation.py`)
+- `army_training_speed_bonus`, `navy_training_speed_bonus`, `air_training_speed_bonus` — stub keys (wired when military sim built)
+- `army_upkeep_reduction`, `navy_upkeep_reduction`, `air_upkeep_reduction` — stub keys
 
-**Stub effect keys** (defined in POLICY_EFFECTS data, not yet consumed by any system):
-- `army_training_speed_bonus`, `navy_training_speed_bonus`, `air_training_speed_bonus`
-- `army_upkeep_reduction`, `navy_upkeep_reduction`, `air_upkeep_reduction`
-- `army_combat_bonus`, `navy_combat_bonus`, `air_combat_bonus`
-- `trade_capacity_bonus`, `diplomatic_reputation`, `espionage_bonus`
+**`POLICY_REQUIREMENTS`:** Gates which nations may select a given level. Keys: `gov_axis_required` (must have at least one of these axis values), `gov_axis_banned` (must not have any), `traits_required`, `traits_banned`, `policies_required`.
 
-**Helper functions** (`nations/policy_effects.py`):
-- `get_nation_policy_effects(nation)` — iterates all `NationPolicy` rows, applies three-layer merge, returns flat effect dict. Called each turn in `simulate_nation_economy()`.
-- `validate_policy_change(nation, category, new_level)` — checks `POLICY_REQUIREMENTS` (government/trait/prerequisite-policy gates) and `POLICY_BANS` (cross-policy conflicts). Returns list of error strings. Called by `_validate_policy_change()` in `turns/validators.py`.
-- `get_policy_building_blocks(nation)` — returns set of building_types blocked by current policies. Checked in `BuildingView.post` before allowing construction.
-- `get_policy_unit_blocks(nation)` — returns set of unit_types blocked by current policies. Wire this into the `train_unit` validator when implementing the military system.
+**`POLICY_BANS`:** Cross-policy incompatibilities. When a nation has `(cat, level)`, the listed `(cat, level)` pairs become unavailable.
 
-**POLICY_REQUIREMENTS** — dict keyed by `(category, level)`. Each entry can specify:
-- `government_types` — allowlist; nation's gov must be in this list
-- `government_types_banned` — blocklist
-- `traits_required` — nation must have at least one of these traits (strong or weak)
-- `traits_banned` — nation must not have any of these traits
-- `policies_required` — list of `(other_category, min_level)` prerequisites (AND logic)
+**`BUILDING_POLICY_REQUIREMENTS` / `BUILDING_POLICY_BANS`:** `get_policy_building_blocks(nation)` returns the set of building types blocked by current policies. Called in `provinces/views.py BuildingView.post` before allowing construction.
 
-**POLICY_BANS** — dict keyed by `(category, level)`. Value is list of `(other_category, other_level)` tuples that this policy level conflicts with. Bidirectional check: both "does our new level ban any existing policy" and "does any existing policy ban our new level."
-
-**BUILDING_POLICY_REQUIREMENTS** — dict keyed by `building_type`. Value is list of `(category, min_level)` (AND logic — all must be met). Checked in `BuildingView.post`.
-
-**BUILDING_POLICY_BANS** — dict keyed by `building_type`. Value is list of `(category, exact_level)` (ANY match blocks). Checked in `BuildingView.post`.
-
-**UNIT_POLICY_REQUIREMENTS / UNIT_POLICY_BANS** — same structure as building equivalents, keyed by `unit_type`. Wire `get_policy_unit_blocks()` into `_validate_train_unit()` in `turns/validators.py` when the military system is active.
-
-**Adding new policy effects:** Add entries to `POLICY_EFFECTS` in `policy_constants.py`. If the effect key is already consumed by `simulate_nation_economy()` (the list above), it wires in automatically. For new effect keys, add consumption in the relevant simulation function and document in this file.
-
-**Adding new policy requirements or bans:** Add to `POLICY_REQUIREMENTS`, `POLICY_BANS`, `BUILDING_POLICY_REQUIREMENTS`, or `BUILDING_POLICY_BANS` in `policy_constants.py`. The helper functions in `policy_effects.py` read these dicts automatically — no code changes needed in views or validators.
+**`UNIT_POLICY_REQUIREMENTS` / `UNIT_POLICY_BANS`:** `get_policy_unit_blocks(nation)` returns the set of unit types blocked. Called in `turns/validators.py _validate_train_unit` (stub — integrate when military sim is built).
 
 ### 2. Construction system
 
@@ -490,6 +478,123 @@ No combat system yet. Provinces can be reassigned via admin, but there is no pla
 
 ### Construction cost/time reduction (wiring stub)
 `construction_cost_reduction` (national) and `construction_time_reduction` (province) effects are computed by buildings but not yet applied in the build API. `get_construction_modifiers(nation)` in `building_simulation.py` aggregates cost reduction and is ready to call from the construction view.
+
+---
+
+## Balance spreadsheet — effects_matrix.xlsx
+
+`effects_matrix.xlsx` in the repo root is the authoritative balance reference. It has five sheets:
+
+| Sheet | Content |
+|-------|---------|
+| Buildings | Per-building, per-level effects at L1 (all 75 buildings) |
+| Government Options | Per-axis-value effects for the five government axes |
+| Traits | Per-trait effects (strong and weak rows separate) |
+| Policy Effects | Per-policy-level effects (base, gov modifier, trait modifier rows) |
+| Legend | Colour key and scale notes |
+
+All numeric cells are real numbers (not text). Percentages are stored as decimals (0.08 = 8%) with a `+0.0%;-0.0%` format. Flat values use `+0.0;-0.0` or integer format. Cell colours: green = positive wired effect, red = negative wired effect, yellow = stub (declared but not yet wired), blue row = first entry in a new category group.
+
+### Column layout (all sheets share this structure)
+
+| Cols | Group | Key effects mapped here |
+|------|-------|------------------------|
+| 1–4 | Labels | Source Type, Name, Category/Axis, Notes |
+| 5–15 | Province Effects | stability_recovery_bonus, growth, farming_bonus, research_bonus, integration_bonus, construction_time_reduction, march/sea/river/air transit |
+| 16–21 | National Capacity | land/naval/air trade capacity, bureaucratic_capacity, upkeep_reduction, construction_cost_reduction |
+| 22–30 | Military (stub) | army/navy/air training speed, combat bonus, upkeep reduction |
+| 31–42 | Gov & Trait Modifiers | stability (flat), growth/turn, integration %, trade %, research %, military %, consumption %, production food/materials/wealth/energy/manpower % |
+| 43–65 | Building Efficiency | one column per building category (financial, light_manufacturing … military_education) |
+| 66–76 | Trait Effects | manpower %, wealth_prod %, food_prod %, rural/urban output, urban growth penalty, urban_threshold, training speed, mil upkeep, building restrictions |
+| 77–84 | Stubs | trade cap, diplo rep, espionage, arms prod |
+
+### Policy Effects sheet row structure
+
+Each row represents one effect source for one policy level:
+
+| Col | Content |
+|-----|---------|
+| A (Source Type) | `Policy Base` / `Policy Gov Mod` / `Policy Trait Mod` |
+| B (Name) | `{Category Name} -- {Level Name}` |
+| C (Category) | Policy category name (human-readable) |
+| D (Notes) | `base` | `when gov: {axis_value}` | `when trait: {trait_key}` |
+| E–CF | Effect values |
+
+Rows with no effects are omitted. First row of each policy category is blue; subsequent rows for the same category are light gray.
+
+### Regenerating the Policy Effects sheet
+
+```bash
+cd backend
+DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe ../tools/export_policy_effects.py
+```
+
+`tools/export_policy_effects.py` reads `POLICY_CATEGORIES` and `POLICY_EFFECTS` from `nations/policy_constants.py` and rewrites only the Policy Effects sheet, leaving the other sheets untouched.
+
+After regenerating, run the numbers-stored-as-text cleanup pass if any new string values were introduced:
+
+```python
+# one-liner cleanup (run from backend/ with Django setup)
+import re, openpyxl
+wb = openpyxl.load_workbook('../effects_matrix.xlsx')
+pct_re = re.compile(r'^([+-]?\d+\.?\d*)%$')
+flat_re = re.compile(r'^([+-]?\d+\.?\d*)$')
+for ws in wb.worksheets:
+    for row in ws.iter_rows():
+        for cell in row:
+            if not isinstance(cell.value, str): continue
+            m = pct_re.match(cell.value.strip())
+            if m:
+                cell.value = float(m.group(1)) / 100
+                cell.number_format = '+0.0%;-0.0%;0.0%'; continue
+            m = flat_re.match(cell.value.strip())
+            if m:
+                v = float(m.group(1))
+                cell.value = v
+                cell.number_format = '+0.0;-0.0;0.0' if '.' in m.group(1) else '+#,##0;-#,##0;0'
+wb.save('../effects_matrix.xlsx')
+```
+
+### Implementing balance changes from a new spreadsheet version
+
+When given an updated `effects_matrix.xlsx` with balance changes, follow these steps:
+
+**1. Read the changed cells from the Policy Effects sheet**
+
+For each changed cell, the row context tells you exactly where in `policy_constants.py` the change belongs:
+
+| Row field | How to interpret |
+|-----------|-----------------|
+| Col A (Source Type) | `Policy Base` → `base` dict; `Policy Gov Mod` → `government_modifiers` dict; `Policy Trait Mod` → `trait_modifiers` dict |
+| Col B (Name) | `{Category Name} -- {Level Name}` — parse category from `POLICY_CATEGORIES` by matching human name, parse level index by matching level name |
+| Col D (Notes) | `base` (ignore); `when gov: {axis_value}` → key in `government_modifiers`; `when trait: {trait_key}` → key in `trait_modifiers` |
+
+**2. Identify the effect key from the column number**
+
+| Col | Effect key | Code value = cell value? |
+|-----|-----------|--------------------------|
+| 20 | `upkeep_reduction` | cell value (decimal, e.g. 0.04) |
+| 31 | `stability_bonus` (if ≥ 0) or `stability_penalty` (if < 0) | cell value (flat number) |
+| 32 | `growth_bonus` (if ≥ 0) or `growth_penalty` (if < 0) | cell value (decimal, e.g. 0.0005) |
+| 33 | `integration_bonus` | cell value (decimal) |
+| 35 | `research_bonus` (if ≥ 0) or `research_penalty` (if < 0) | cell value (decimal) |
+| 38 | `food_production_bonus` | cell value (decimal) |
+| 40 | `wealth_production_bonus` | cell value (decimal) |
+| 42 | `manpower_bonus` | cell value (decimal, may be negative) |
+| 43–65 | `building_efficiency_bonus[{category}]` | cell value (decimal) |
+| 22,24,25,27,28,30 | military stub keys (see EFFECT_COL in export script) | cell value (decimal) |
+
+**All cell values map directly to the code value** — no conversion needed. The spreadsheet stores 0.08, the code stores 0.08.
+
+**3. Apply the change in `nations/policy_constants.py`**
+
+Find the entry at `POLICY_EFFECTS[category_key][level_index]` and update the appropriate nested dict (`base`, `government_modifiers[axis_val]`, or `trait_modifiers[trait_key]`).
+
+Category key format: lowercase with underscores (e.g. `"Military Service"` → `"military_service"`). Level index is the 0-based position in `POLICY_CATEGORIES[cat]["levels"]`.
+
+**4. Regenerate the sheet to confirm round-trip**
+
+Run `export_policy_effects.py` and verify the changed cell shows the new value.
 
 ---
 

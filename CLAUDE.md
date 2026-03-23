@@ -36,12 +36,13 @@ provinces/travel_constants.py    — travel speed constants, cross-type requirem
 provinces/travel.py              — get_march_time(), get_embark_time(), get_zone_travel_time(), check_cross_type_requirements()
 economy/constants.py             — FOOD_CONSUMPTION_PER_POP, stability penalties, government types
 nations/trait_constants.py       — 18 ideology traits in 9 pairs, trait effects, validation
-nations/policy_constants.py      — 66 policy categories with discrete levels
+nations/policy_constants.py      — 67 policy categories with discrete levels + POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, BUILDING_POLICY_REQUIREMENTS, BUILDING_POLICY_BANS, UNIT_POLICY_REQUIREMENTS, UNIT_POLICY_BANS
+nations/policy_effects.py        — get_nation_policy_effects(), validate_policy_change(), get_policy_building_blocks(), get_policy_unit_blocks()
 ```
 
 ---
 
-## Systems built (as of 2026-03-20)
+## Systems built (as of 2026-03-22)
 
 ### 1. Buildings system
 
@@ -133,12 +134,13 @@ Helper functions: `get_province_building_effects(province)` and `get_national_bu
 
 ### 1b. Building efficiency — multi-source modifier system
 
-`efficiency_mult = 1.0 + sum(all additive bonuses)` applied to building **output only** (not inputs). Five sources, each separately additive (source 2 replaced old ideology with trait bonuses):
+`efficiency_mult = 1.0 + sum(all additive bonuses)` applied to building **output only** (not inputs). Six sources, each separately additive:
 
 | # | Source | Where defined | Scope |
 |---|--------|--------------|-------|
 | 1 | **Government type** | `GOVERNMENT_TYPES["building_efficiency"]` | National, per category — 2-3 entries per government type |
 | 2 | **Trait bonuses** | `TRAIT_DEFS[trait]["*_effects"]["building_efficiency_bonus"]` | National, per category — varies by trait selection |
+| 2b | **Policy bonuses** | `POLICY_EFFECTS[cat][level]["base"]["building_efficiency_bonus"]` | National, per category — from active policy levels |
 | 3 | **GM crisis/boon** | `NationModifier(category="building_efficiency", target=…)` | National, target = category name or `"all"` |
 | 4 | **Input co-location** | `INPUT_COLOCATION_BONUS = 0.10` | Per-building: fires if ANY input good is locally available — either the province terrain's primary resource, or a good produced by another active building in the same province |
 | 5 | **Industry cluster** | `INDUSTRY_CLUSTER_BONUS = 0.05` | Per-building: +5% per other active same-category building in province |
@@ -215,18 +217,69 @@ Construction cost (all three, L1/L2/L3): ~5000 materials + 4000–16000 wealth; 
 
 **Stub effects (awaiting future systems):** trade_capacity, diplomatic_reputation, espionage, bureaucratic_capacity, happiness, literacy, military_organisation, etc.
 
-### 1d. Policies system
+### 1e. Policies system
 
-**What:** 66 policy categories, each with 2-10 discrete levels. One row per (nation, category) in `NationPolicy` model.
+**What:** 67 policy categories, each with 2-10 discrete levels. One row per (nation, category) in `NationPolicy` model. Policy effects are fully wired into the simulation and building system.
 
 **Key files:**
-- `nations/policy_constants.py` — `POLICY_CATEGORIES` dict with all levels
+- `nations/policy_constants.py` — `POLICY_CATEGORIES` (level definitions), `POLICY_EFFECTS` (context-dependent effects), `POLICY_REQUIREMENTS`, `POLICY_BANS`, `BUILDING_POLICY_REQUIREMENTS`, `BUILDING_POLICY_BANS`, `UNIT_POLICY_REQUIREMENTS`, `UNIT_POLICY_BANS`
+- `nations/policy_effects.py` — helper functions (see below)
 - `nations/models.py` — `NationPolicy` model
 - `nations/helpers.py` — `create_default_policies(nation)` bulk-creates defaults on nation creation
 
 **Policy changes:** Submitted as orders via `policy_change` order type with `change_type: "policy_level"`, `category`, and `new_level`. Validated in `turns/validators.py`, executed in `turns/engine.py`.
 
-**Policy effects:** Currently stubs (empty `effects` dicts). Designed to be wired into simulation as systems are built.
+**POLICY_EFFECTS structure** — each `(category, level)` entry has three optional layers:
+```python
+{
+    "base": {<effect_key>: <value>, ...},
+    "government_modifiers": {<gov_type>: {<effect_key>: <value>, ...}, ...},
+    "trait_modifiers": {<trait_key>: {<effect_key>: <value>, ...}, ...},
+}
+```
+All numeric values are additive. `building_efficiency_bonus` values are dicts (`category → bonus`) merged by category key. Merge order: base → government_modifiers (matching gov_type) → trait_modifiers (all matching traits).
+
+**Policy effect keys wired into simulation** (`economy/simulation.py`):
+- `stability_bonus/penalty` — flat national stability adjustment
+- `growth_bonus/penalty` — per-month population growth rate
+- `integration_bonus` — stacks with base integration efficiency
+- `research_bonus/penalty` — percentage modifier on research production
+- `manpower_bonus` — percentage modifier on manpower production
+- `wealth_production_bonus` — percentage modifier on wealth production
+- `food_production_bonus` — percentage modifier on food production
+- `upkeep_reduction` — fraction reduction in government upkeep
+- `building_efficiency_bonus` — dict of building category → bonus (wired into efficiency system as source 2b)
+
+**Stub effect keys** (defined in POLICY_EFFECTS data, not yet consumed by any system):
+- `army_training_speed_bonus`, `navy_training_speed_bonus`, `air_training_speed_bonus`
+- `army_upkeep_reduction`, `navy_upkeep_reduction`, `air_upkeep_reduction`
+- `army_combat_bonus`, `navy_combat_bonus`, `air_combat_bonus`
+- `trade_capacity_bonus`, `diplomatic_reputation`, `espionage_bonus`
+
+**Helper functions** (`nations/policy_effects.py`):
+- `get_nation_policy_effects(nation)` — iterates all `NationPolicy` rows, applies three-layer merge, returns flat effect dict. Called each turn in `simulate_nation_economy()`.
+- `validate_policy_change(nation, category, new_level)` — checks `POLICY_REQUIREMENTS` (government/trait/prerequisite-policy gates) and `POLICY_BANS` (cross-policy conflicts). Returns list of error strings. Called by `_validate_policy_change()` in `turns/validators.py`.
+- `get_policy_building_blocks(nation)` — returns set of building_types blocked by current policies. Checked in `BuildingView.post` before allowing construction.
+- `get_policy_unit_blocks(nation)` — returns set of unit_types blocked by current policies. Wire this into the `train_unit` validator when implementing the military system.
+
+**POLICY_REQUIREMENTS** — dict keyed by `(category, level)`. Each entry can specify:
+- `government_types` — allowlist; nation's gov must be in this list
+- `government_types_banned` — blocklist
+- `traits_required` — nation must have at least one of these traits (strong or weak)
+- `traits_banned` — nation must not have any of these traits
+- `policies_required` — list of `(other_category, min_level)` prerequisites (AND logic)
+
+**POLICY_BANS** — dict keyed by `(category, level)`. Value is list of `(other_category, other_level)` tuples that this policy level conflicts with. Bidirectional check: both "does our new level ban any existing policy" and "does any existing policy ban our new level."
+
+**BUILDING_POLICY_REQUIREMENTS** — dict keyed by `building_type`. Value is list of `(category, min_level)` (AND logic — all must be met). Checked in `BuildingView.post`.
+
+**BUILDING_POLICY_BANS** — dict keyed by `building_type`. Value is list of `(category, exact_level)` (ANY match blocks). Checked in `BuildingView.post`.
+
+**UNIT_POLICY_REQUIREMENTS / UNIT_POLICY_BANS** — same structure as building equivalents, keyed by `unit_type`. Wire `get_policy_unit_blocks()` into `_validate_train_unit()` in `turns/validators.py` when the military system is active.
+
+**Adding new policy effects:** Add entries to `POLICY_EFFECTS` in `policy_constants.py`. If the effect key is already consumed by `simulate_nation_economy()` (the list above), it wires in automatically. For new effect keys, add consumption in the relevant simulation function and document in this file.
+
+**Adding new policy requirements or bans:** Add to `POLICY_REQUIREMENTS`, `POLICY_BANS`, `BUILDING_POLICY_REQUIREMENTS`, or `BUILDING_POLICY_BANS` in `policy_constants.py`. The helper functions in `policy_effects.py` read these dicts automatically — no code changes needed in views or validators.
 
 ### 2. Construction system
 
@@ -463,6 +516,8 @@ from provinces.jobs import get_province_job_status, calculate_province_designati
 from provinces.models import AirZone, SeaZone, RiverZone
 from provinces.travel import get_march_time, get_embark_time, get_zone_travel_time, check_cross_type_requirements
 from provinces.travel_constants import CROSS_TYPE_REQUIREMENTS, FREE_CROSS_TYPE_TRANSITIONS
+from nations.policy_effects import get_nation_policy_effects, validate_policy_change, get_policy_building_blocks, get_policy_unit_blocks
+from nations.policy_constants import POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, BUILDING_POLICY_REQUIREMENTS, BUILDING_POLICY_BANS, UNIT_POLICY_REQUIREMENTS, UNIT_POLICY_BANS
 print('OK')
 "
 ```

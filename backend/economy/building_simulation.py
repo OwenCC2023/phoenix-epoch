@@ -141,6 +141,12 @@ def get_building_efficiency_modifiers(nation, turn_number):
     for cat, bonus in trait_effects.get("building_efficiency_bonus", {}).items():
         merged[cat] = merged.get(cat, 0.0) + bonus
 
+    # Source 2b: policy building_efficiency_bonus
+    from nations.policy_effects import get_nation_policy_effects
+    policy_effects = get_nation_policy_effects(nation)
+    for cat, bonus in policy_effects.get("building_efficiency_bonus", {}).items():
+        merged[cat] = merged.get(cat, 0.0) + bonus
+
     # Source 3: active GM NationModifiers (crises and boons)
     for mod in nation.modifiers.all():
         if mod.expires_turn and mod.expires_turn < turn_number:

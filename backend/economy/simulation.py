@@ -110,15 +110,43 @@ def simulate_nation_economy(nation, turn_number):
     from nations.helpers import get_nation_trait_effects
     trait_effects = get_nation_trait_effects(nation)
 
-    # Apply trait bonuses to national modifiers
-    integration_bonus_from_traits = trait_effects.get("integration_bonus", 0.0)
-    stability_bonus_from_traits = trait_effects.get("stability_bonus", 0.0) + trait_effects.get("stability_penalty", 0.0)
-    growth_bonus_from_traits = trait_effects.get("growth_bonus", 0.0) + trait_effects.get("growth_penalty", 0.0)
-    research_mod_from_traits = trait_effects.get("research_bonus", 0.0) + trait_effects.get("research_penalty", 0.0)
-    manpower_mod_from_traits = trait_effects.get("manpower_bonus", 0.0)
-    wealth_mod_from_traits = trait_effects.get("wealth_production_bonus", 0.0)
-    food_mod_from_traits = trait_effects.get("food_production_bonus", 0.0)
-    upkeep_reduction_from_traits = trait_effects.get("upkeep_reduction", 0.0)
+    # Gather policy effects (context-dependent on government/traits)
+    from nations.policy_effects import get_nation_policy_effects
+    policy_effects = get_nation_policy_effects(nation)
+
+    # Apply trait + policy bonuses to national modifiers
+    integration_bonus_from_traits = (
+        trait_effects.get("integration_bonus", 0.0)
+        + policy_effects.get("integration_bonus", 0.0)
+    )
+    stability_bonus_from_traits = (
+        trait_effects.get("stability_bonus", 0.0) + trait_effects.get("stability_penalty", 0.0)
+        + policy_effects.get("stability_bonus", 0.0) + policy_effects.get("stability_penalty", 0.0)
+    )
+    growth_bonus_from_traits = (
+        trait_effects.get("growth_bonus", 0.0) + trait_effects.get("growth_penalty", 0.0)
+        + policy_effects.get("growth_bonus", 0.0) + policy_effects.get("growth_penalty", 0.0)
+    )
+    research_mod_from_traits = (
+        trait_effects.get("research_bonus", 0.0) + trait_effects.get("research_penalty", 0.0)
+        + policy_effects.get("research_bonus", 0.0) + policy_effects.get("research_penalty", 0.0)
+    )
+    manpower_mod_from_traits = (
+        trait_effects.get("manpower_bonus", 0.0)
+        + policy_effects.get("manpower_bonus", 0.0)
+    )
+    wealth_mod_from_traits = (
+        trait_effects.get("wealth_production_bonus", 0.0)
+        + policy_effects.get("wealth_production_bonus", 0.0)
+    )
+    food_mod_from_traits = (
+        trait_effects.get("food_production_bonus", 0.0)
+        + policy_effects.get("food_production_bonus", 0.0)
+    )
+    upkeep_reduction_from_traits = (
+        trait_effects.get("upkeep_reduction", 0.0)
+        + policy_effects.get("upkeep_reduction", 0.0)
+    )
 
     integration_modifier = BASE_INTEGRATION_EFFICIENCY + national_modifiers.get("integration", 0) + integration_bonus_from_traits
     integration_modifier = max(0.5, min(1.0, integration_modifier))

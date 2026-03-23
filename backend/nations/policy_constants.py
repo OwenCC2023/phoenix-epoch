@@ -730,3 +730,2454 @@ POLICY_CATEGORIES = {
 
 # Convenience: total number of policy categories
 POLICY_CATEGORY_COUNT = len(POLICY_CATEGORIES)
+
+
+# =============================================================================
+# POLICY_EFFECTS — Context-dependent effects for all 67 categories
+#
+# Structure per level:
+#   {
+#       "base": {<effect_key>: <value>, ...},
+#       "government_modifiers": {<gov_type>: {<effect_key>: <value>, ...}, ...},
+#       "trait_modifiers": {<trait_key>: {<effect_key>: <value>, ...}, ...},
+#   }
+#
+# Merge: start with base, add matching government_modifiers, add all matching
+# trait_modifiers.  All numeric values are additive.  building_efficiency_bonus
+# dicts merge by category key.
+# =============================================================================
+
+POLICY_EFFECTS = {
+    # =========================================================================
+    # MILITARY (7 categories)
+    # =========================================================================
+    "military_service": {
+        0: {  # disarmed_nation
+            "base": {
+                "stability_bonus": 2.0,
+                "growth_bonus": 0.0005,
+                "manpower_bonus": -0.50,
+                "army_training_speed_bonus": -0.30,
+            },
+            "government_modifiers": {
+                "junta": {"stability_penalty": -6.0},
+            },
+            "trait_modifiers": {
+                "pacifist": {"stability_bonus": 2.0},
+                "militarist": {"stability_penalty": -4.0},
+            },
+        },
+        1: {"base": {}},  # volunteer_only (default)
+        2: {  # limited_conscription
+            "base": {
+                "manpower_bonus": 0.10,
+                "growth_penalty": -0.0003,
+                "stability_penalty": -1.0,
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -1.0},
+                "junta": {"stability_bonus": 1.0},
+                "autocracy": {"stability_bonus": 0.5},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_penalty": -1.5},
+                "authoritarian": {"stability_bonus": 0.5},
+                "pacifist": {"stability_penalty": -1.0},
+            },
+        },
+        3: {  # extensive_conscription
+            "base": {
+                "manpower_bonus": 0.25,
+                "growth_penalty": -0.0008,
+                "stability_penalty": -2.0,
+                "wealth_production_bonus": -0.03,
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -3.0},
+                "commune": {"stability_penalty": -1.0},
+                "junta": {"stability_bonus": 2.0},
+                "autocracy": {"stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_penalty": -3.0},
+                "militarist": {"stability_bonus": 1.0, "manpower_bonus": 0.05},
+                "pacifist": {"stability_penalty": -2.0},
+                "authoritarian": {"stability_bonus": 1.0},
+            },
+        },
+        4: {  # universal_service
+            "base": {
+                "manpower_bonus": 0.40,
+                "growth_penalty": -0.001,
+                "stability_penalty": -3.0,
+                "wealth_production_bonus": -0.05,
+                "army_upkeep_reduction": 0.04,
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -5.0},
+                "tribal": {"stability_penalty": -3.0},
+                "junta": {"stability_bonus": 3.0},
+                "autocracy": {"stability_bonus": 2.0},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_penalty": -5.0},
+                "militarist": {"stability_bonus": 2.0, "manpower_bonus": 0.10},
+                "nationalist": {"stability_bonus": 1.0},
+                "pacifist": {"stability_penalty": -4.0, "growth_penalty": -0.001},
+            },
+        },
+        5: {  # service_by_requirement
+            "base": {
+                "manpower_bonus": 0.35,
+                "growth_penalty": -0.0008,
+                "stability_penalty": -2.0,
+                "army_upkeep_reduction": 0.03,
+                "navy_upkeep_reduction": 0.02,
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -2.0},
+                "junta": {"stability_bonus": 2.0},
+            },
+            "trait_modifiers": {
+                "militarist": {"manpower_bonus": 0.05},
+                "authoritarian": {"stability_bonus": 1.0},
+            },
+        },
+        6: {  # scraping_the_barrel
+            "base": {
+                "manpower_bonus": 0.60,
+                "growth_penalty": -0.002,
+                "stability_penalty": -5.0,
+                "wealth_production_bonus": -0.10,
+                "food_production_bonus": -0.05,
+                "army_upkeep_reduction": 0.06,
+                "navy_upkeep_reduction": 0.03,
+                "air_upkeep_reduction": 0.02,
+            },
+            "government_modifiers": {
+                "junta": {"stability_bonus": 2.0},
+            },
+            "trait_modifiers": {
+                "militarist": {"stability_bonus": 1.0},
+                "nationalist": {"stability_bonus": 1.0},
+            },
+        },
+    },
+
+    "military_spending": {
+        0: {  # minimal_military
+            "base": {
+                "stability_bonus": 1.0,
+                "upkeep_reduction": 0.05,
+                "military_upkeep_reduction": -0.15,
+                "army_upkeep_reduction": 0.06,
+                "navy_upkeep_reduction": 0.06,
+                "air_upkeep_reduction": 0.06,
+            },
+            "trait_modifiers": {
+                "pacifist": {"stability_bonus": 1.0},
+                "militarist": {"stability_penalty": -3.0},
+            },
+        },
+        1: {"base": {}},  # low_military (default)
+        2: {  # moderate_military
+            "base": {
+                "upkeep_reduction": -0.02,
+            },
+            "trait_modifiers": {
+                "militarist": {"army_combat_bonus": 0.03},
+            },
+        },
+        3: {  # high_military
+            "base": {
+                "upkeep_reduction": -0.05,
+                "army_combat_bonus": 0.05,
+                "navy_combat_bonus": 0.05,
+                "air_combat_bonus": 0.05,
+                "stability_penalty": -1.0,
+                "army_upkeep_reduction": -0.03,
+            },
+            "government_modifiers": {
+                "junta": {"stability_bonus": 1.0, "army_combat_bonus": 0.03},
+                "democracy": {"stability_penalty": -1.0},
+                "commune": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "militarist": {"army_combat_bonus": 0.05, "stability_bonus": 1.0},
+                "pacifist": {"stability_penalty": -2.0},
+            },
+        },
+        4: {  # war_economy
+            "base": {
+                "upkeep_reduction": -0.10,
+                "army_combat_bonus": 0.08,
+                "navy_combat_bonus": 0.08,
+                "air_combat_bonus": 0.08,
+                "army_training_speed_bonus": 0.15,
+                "navy_training_speed_bonus": 0.15,
+                "air_training_speed_bonus": 0.15,
+                "stability_penalty": -3.0,
+                "growth_penalty": -0.001,
+                "wealth_production_bonus": -0.08,
+                "building_efficiency_bonus": {"heavy_manufacturing": 0.05},
+                "navy_upkeep_reduction": -0.05,
+                "air_upkeep_reduction": -0.05,
+            },
+            "government_modifiers": {
+                "junta": {"stability_bonus": 3.0, "building_efficiency_bonus": {"heavy_manufacturing": 0.05}},
+                "autocracy": {"stability_bonus": 1.0},
+                "democracy": {"stability_penalty": -4.0},
+                "corporate": {"stability_penalty": -2.0, "wealth_production_bonus": -0.05},
+            },
+            "trait_modifiers": {
+                "militarist": {
+                    "stability_bonus": 2.0,
+                    "army_combat_bonus": 0.05,
+                    "building_efficiency_bonus": {"heavy_manufacturing": 0.03},
+                },
+                "pacifist": {"stability_penalty": -5.0, "growth_penalty": -0.001},
+                "industrialist": {"building_efficiency_bonus": {"heavy_manufacturing": 0.05}},
+            },
+        },
+    },
+
+    "military_doctrine": {
+        0: {  # static_defence
+            "base": {
+                "army_combat_bonus": 0.03,
+                "march_speed_bonus": -0.05,
+            },
+            "trait_modifiers": {
+                "traditionalist": {"army_combat_bonus": 0.02},
+            },
+        },
+        1: {  # mobile_warfare
+            "base": {
+                "march_speed_bonus": 0.05,
+                "army_combat_bonus": 0.02,
+            },
+            "trait_modifiers": {
+                "modern": {"march_speed_bonus": 0.02},
+            },
+        },
+        2: {  # guerrilla_warfare
+            "base": {
+                "army_combat_bonus": 0.02,
+                "army_upkeep_reduction": 0.05,
+            },
+            "trait_modifiers": {
+                "libertarian": {"army_combat_bonus": 0.02},
+                "authoritarian": {"army_combat_bonus": -0.02},
+            },
+        },
+        3: {  # combined_arms
+            "base": {
+                "army_combat_bonus": 0.05,
+                "navy_combat_bonus": 0.03,
+                "air_combat_bonus": 0.03,
+                "sea_transit_speed": 0.03,
+                "air_transit_speed": 0.03,
+            },
+            "trait_modifiers": {
+                "modern": {"army_combat_bonus": 0.03},
+                "traditionalist": {"army_combat_bonus": -0.02},
+            },
+        },
+    },
+
+    "veterans_policy": {
+        0: {  # no_veterans_support
+            "base": {
+                "stability_penalty": -0.5,
+            },
+            "trait_modifiers": {
+                "militarist": {"stability_penalty": -1.5},
+            },
+        },
+        1: {"base": {}},  # basic_veterans_care (default)
+        2: {  # veterans_benefits
+            "base": {
+                "stability_bonus": 1.0,
+                "upkeep_reduction": -0.02,
+                "growth_bonus": 0.0003,
+                "army_upkeep_reduction": -0.02,
+            },
+            "trait_modifiers": {
+                "militarist": {"stability_bonus": 0.5},
+                "nationalist": {"stability_bonus": 0.5},
+            },
+        },
+        3: {  # hero_worship
+            "base": {
+                "stability_bonus": 2.0,
+                "manpower_bonus": 0.05,
+                "upkeep_reduction": -0.03,
+                "army_combat_bonus": 0.02,
+                "stability_recovery_bonus": 0.03,
+            },
+            "government_modifiers": {
+                "junta": {"stability_bonus": 1.0, "manpower_bonus": 0.03},
+                "democracy": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "militarist": {"stability_bonus": 1.0, "manpower_bonus": 0.05},
+                "pacifist": {"stability_penalty": -2.0},
+                "nationalist": {"stability_bonus": 1.0},
+            },
+        },
+    },
+
+    "border_policy": {
+        0: {  # open_borders
+            "base": {
+                "growth_bonus": 0.001,
+                "stability_penalty": -1.0,
+                "land_trade_capacity": 100,
+                "naval_trade_capacity": 50,
+            },
+            "government_modifiers": {
+                "tribal": {"stability_penalty": -2.0},
+            },
+            "trait_modifiers": {
+                "internationalist": {"stability_bonus": 1.0, "growth_bonus": 0.0005},
+                "nationalist": {"stability_penalty": -3.0},
+            },
+        },
+        1: {"base": {}},  # monitored_borders (default)
+        2: {  # controlled_borders
+            "base": {
+                "stability_bonus": 0.5,
+                "growth_penalty": -0.0003,
+            },
+            "trait_modifiers": {
+                "nationalist": {"stability_bonus": 0.5},
+            },
+        },
+        3: {  # restricted_borders
+            "base": {
+                "stability_bonus": 1.0,
+                "growth_penalty": -0.0005,
+                "land_trade_capacity": -75,
+                "march_speed_bonus": -0.03,
+            },
+            "trait_modifiers": {
+                "nationalist": {"stability_bonus": 1.0},
+                "internationalist": {"stability_penalty": -1.0},
+            },
+        },
+        4: {  # closed_borders
+            "base": {
+                "stability_bonus": 1.5,
+                "growth_penalty": -0.001,
+                "land_trade_capacity": -150,
+                "naval_trade_capacity": -100,
+                "air_trade_capacity": -50,
+            },
+            "government_modifiers": {
+                "corporate": {"stability_penalty": -2.0, "wealth_production_bonus": -0.05},
+            },
+            "trait_modifiers": {
+                "nationalist": {"stability_bonus": 1.5},
+                "internationalist": {"stability_penalty": -3.0},
+            },
+        },
+    },
+
+    "weapons_policy": {
+        0: {  # universal_arms
+            "base": {
+                "manpower_bonus": 0.08,
+                "stability_penalty": -1.0,
+                "army_training_speed_bonus": 0.05,
+                "army_upkeep_reduction": 0.03,
+            },
+            "government_modifiers": {
+                "autocracy": {"stability_penalty": -2.0},
+                "junta": {"stability_penalty": -2.0},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_bonus": 1.0},
+                "militarist": {"manpower_bonus": 0.03},
+                "authoritarian": {"stability_penalty": -1.5},
+            },
+        },
+        1: {"base": {}},  # licensed_arms (default)
+        2: {  # restricted_arms
+            "base": {
+                "stability_bonus": 0.5,
+                "manpower_bonus": -0.05,
+            },
+            "trait_modifiers": {
+                "authoritarian": {"stability_bonus": 0.5},
+                "libertarian": {"stability_penalty": -1.0},
+            },
+        },
+        3: {  # state_monopoly_arms
+            "base": {
+                "stability_bonus": 1.0,
+                "manpower_bonus": -0.10,
+                "army_training_speed_bonus": -0.05,
+                "army_upkeep_reduction": -0.03,
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -1.5},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"stability_bonus": 1.0},
+                "libertarian": {"stability_penalty": -3.0},
+                "pacifist": {"stability_bonus": 1.0},
+            },
+        },
+    },
+
+    "intelligence_policy": {
+        0: {  # no_intelligence
+            "base": {
+                "upkeep_reduction": 0.02,
+            },
+            "trait_modifiers": {
+                "devious": {"stability_penalty": -1.0},
+            },
+        },
+        1: {"base": {}},  # basic_intelligence (default)
+        2: {  # active_intelligence
+            "base": {
+                "upkeep_reduction": -0.02,
+                "stability_bonus": 0.5,
+                "building_efficiency_bonus": {"government_security": 0.03},
+            },
+            "trait_modifiers": {
+                "devious": {"stability_bonus": 0.5},
+            },
+        },
+        3: {  # pervasive_surveillance
+            "base": {
+                "upkeep_reduction": -0.04,
+                "stability_bonus": 2.0,
+                "growth_penalty": -0.0003,
+                "research_penalty": -0.03,
+                "building_efficiency_bonus": {"government_security": 0.05},
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -4.0},
+                "commune": {"stability_penalty": -2.0},
+                "autocracy": {"stability_bonus": 1.0},
+                "junta": {"stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_penalty": -5.0},
+                "authoritarian": {"stability_bonus": 2.0},
+                "devious": {"stability_bonus": 1.0},
+                "honorable": {"stability_penalty": -2.0},
+            },
+        },
+    },
+
+    # =========================================================================
+    # ECONOMY (12 categories)
+    # =========================================================================
+    "economic_system": {
+        0: {  # free_market
+            "base": {
+                "wealth_production_bonus": 0.08,
+                "building_efficiency_bonus": {"financial": 0.06, "light_manufacturing": 0.04},
+                "integration_bonus": 0.03,
+                "stability_penalty": -1.0,
+                "urban_output_bonus": 0.04,
+                "land_trade_capacity": 100,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.05, "stability_bonus": 1.0},
+                "commune": {"stability_penalty": -4.0},
+                "autocracy": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "individualist": {"wealth_production_bonus": 0.04, "stability_bonus": 1.0},
+                "collectivist": {"stability_penalty": -2.0},
+                "libertarian": {"stability_bonus": 1.0, "wealth_production_bonus": 0.03},
+            },
+        },
+        1: {  # mixed_economy
+            "base": {
+                "wealth_production_bonus": 0.03,
+                "stability_bonus": 0.5,
+            },
+        },
+        2: {"base": {}},  # managed_economy (default)
+        3: {  # command_economy
+            "base": {
+                "building_efficiency_bonus": {"heavy_manufacturing": 0.06, "extraction": 0.04, "construction": 0.04},
+                "wealth_production_bonus": -0.05,
+                "integration_bonus": 0.05,
+                "stability_penalty": -1.0,
+                "rural_output_bonus": 0.03,
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 2.0, "building_efficiency_bonus": {"farming": 0.04}},
+                "autocracy": {"stability_bonus": 1.0, "integration_bonus": 0.03},
+                "democracy": {"stability_penalty": -4.0},
+                "corporate": {"stability_penalty": -5.0},
+            },
+            "trait_modifiers": {
+                "collectivist": {"stability_bonus": 2.0, "integration_bonus": 0.03},
+                "individualist": {"stability_penalty": -3.0, "wealth_production_bonus": -0.05},
+                "authoritarian": {"stability_bonus": 1.0},
+                "libertarian": {"stability_penalty": -4.0},
+            },
+        },
+        4: {  # barter_economy
+            "base": {
+                "wealth_production_bonus": -0.10,
+                "land_trade_capacity": -150,
+                "naval_trade_capacity": -100,
+            },
+            "trait_modifiers": {
+                "individualist": {"stability_bonus": 0.5},
+            },
+        },
+    },
+
+    "taxation": {
+        0: {  # no_taxes
+            "base": {
+                "wealth_production_bonus": 0.06,
+                "upkeep_reduction": -0.15,
+                "stability_bonus": 1.0,
+                "building_efficiency_bonus": {"government_management": -0.06, "government_welfare": -0.06},
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.03},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_bonus": 1.0},
+                "collectivist": {"stability_penalty": -2.0},
+            },
+        },
+        1: {  # low_taxes
+            "base": {
+                "wealth_production_bonus": 0.03,
+                "upkeep_reduction": -0.05,
+                "growth_bonus": 0.0002,
+            },
+            "trait_modifiers": {
+                "individualist": {"wealth_production_bonus": 0.02},
+            },
+        },
+        2: {"base": {}},  # moderate_taxes (default)
+        3: {  # high_taxes
+            "base": {
+                "wealth_production_bonus": -0.04,
+                "upkeep_reduction": 0.06,
+                "integration_bonus": 0.03,
+                "stability_penalty": -1.0,
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 1.0},
+                "autocracy": {"integration_bonus": 0.02},
+            },
+            "trait_modifiers": {
+                "collectivist": {"stability_bonus": 0.5},
+                "libertarian": {"stability_penalty": -2.0},
+            },
+        },
+        4: {  # confiscatory_taxes
+            "base": {
+                "wealth_production_bonus": -0.08,
+                "upkeep_reduction": 0.10,
+                "integration_bonus": 0.05,
+                "stability_penalty": -2.5,
+                "growth_penalty": -0.0003,
+            },
+            "government_modifiers": {
+                "autocracy": {"stability_bonus": 1.0},
+                "corporate": {"stability_penalty": -3.0},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"stability_bonus": 1.0},
+                "libertarian": {"stability_penalty": -3.0},
+                "individualist": {"stability_penalty": -2.0},
+            },
+        },
+    },
+
+    "trade_policy": {
+        0: {  # free_trade
+            "base": {
+                "wealth_production_bonus": 0.05,
+                "land_trade_capacity": 200,
+                "naval_trade_capacity": 150,
+                "air_trade_capacity": 100,
+                "building_efficiency_bonus": {"financial": 0.04, "transport": 0.03},
+                "stability_penalty": -0.5,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.03, "naval_trade_capacity": 50},
+                "commune": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "internationalist": {"wealth_production_bonus": 0.02, "land_trade_capacity": 50},
+                "nationalist": {"stability_penalty": -1.0},
+            },
+        },
+        1: {"base": {}},  # moderate_tariffs (default)
+        2: {  # protectionist
+            "base": {
+                "building_efficiency_bonus": {"light_manufacturing": 0.03, "heavy_manufacturing": 0.03},
+                "wealth_production_bonus": -0.03,
+                "land_trade_capacity": -100,
+                "naval_trade_capacity": -75,
+                "stability_bonus": 0.5,
+            },
+            "government_modifiers": {
+                "autocracy": {"building_efficiency_bonus": {"heavy_manufacturing": 0.02}},
+            },
+            "trait_modifiers": {
+                "nationalist": {"stability_bonus": 0.5},
+                "internationalist": {"stability_penalty": -1.0},
+            },
+        },
+        3: {  # autarky
+            "base": {
+                "building_efficiency_bonus": {"heavy_manufacturing": 0.04, "farming": 0.03, "extraction": 0.03},
+                "wealth_production_bonus": -0.06,
+                "land_trade_capacity": -200,
+                "naval_trade_capacity": -150,
+                "air_trade_capacity": -100,
+                "integration_bonus": 0.04,
+                "stability_bonus": 1.0,
+            },
+            "government_modifiers": {
+                "autocracy": {"stability_bonus": 1.0},
+                "corporate": {"stability_penalty": -3.0, "wealth_production_bonus": -0.04},
+            },
+            "trait_modifiers": {
+                "nationalist": {"stability_bonus": 1.0, "integration_bonus": 0.02},
+                "internationalist": {"stability_penalty": -2.0},
+            },
+        },
+    },
+
+    "currency_policy": {
+        0: {  # commodity_money
+            "base": {
+                "wealth_production_bonus": -0.04,
+                "naval_trade_capacity": -50,
+                "stability_bonus": 1.0,
+            },
+            "government_modifiers": {
+                "tribal": {"stability_bonus": 0.5},
+            },
+            "trait_modifiers": {
+                "traditionalist": {"stability_bonus": 0.5},
+            },
+        },
+        1: {"base": {}},  # backed_currency (default)
+        2: {  # fiat_currency
+            "base": {
+                "wealth_production_bonus": 0.04,
+                "land_trade_capacity": 100,
+                "naval_trade_capacity": 50,
+                "stability_penalty": -0.5,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.02},
+                "democracy": {"stability_bonus": 0.5},
+            },
+            "trait_modifiers": {
+                "modern": {"wealth_production_bonus": 0.02},
+                "traditionalist": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "property_rights": {
+        0: {  # communal_property
+            "base": {
+                "integration_bonus": 0.04,
+                "stability_bonus": 1.0,
+                "wealth_production_bonus": -0.05,
+                "building_efficiency_bonus": {"farming": 0.04},
+                "rural_output_bonus": 0.03,
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 1.0, "rural_output_bonus": 0.02},
+                "corporate": {"stability_penalty": -3.0},
+            },
+            "trait_modifiers": {
+                "collectivist": {"stability_bonus": 0.5, "integration_bonus": 0.02},
+                "individualist": {"stability_penalty": -2.0},
+            },
+        },
+        1: {"base": {}},  # mixed_property (default)
+        2: {  # strong_property
+            "base": {
+                "wealth_production_bonus": 0.05,
+                "building_efficiency_bonus": {"financial": 0.04},
+                "stability_penalty": -0.5,
+                "urban_output_bonus": 0.03,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.03, "stability_bonus": 0.5},
+                "commune": {"stability_penalty": -2.0},
+            },
+            "trait_modifiers": {
+                "individualist": {"wealth_production_bonus": 0.02},
+                "libertarian": {"stability_bonus": 0.5},
+            },
+        },
+    },
+
+    "labour_policy": {
+        0: {  # forced_labour
+            "base": {
+                "building_efficiency_bonus": {"construction": 0.05, "extraction": 0.04, "heavy_manufacturing": 0.03},
+                "stability_penalty": -2.0,
+                "growth_penalty": -0.0005,
+                "manpower_bonus": 0.08,
+            },
+            "government_modifiers": {
+                "junta": {"stability_bonus": 1.0, "manpower_bonus": 0.04},
+                "democracy": {"stability_penalty": -4.0},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"stability_bonus": 1.0},
+                "egalitarian": {"stability_penalty": -3.0},
+                "libertarian": {"stability_penalty": -3.0},
+            },
+        },
+        1: {"base": {}},  # regulated_labour (default)
+        2: {  # worker_councils
+            "base": {
+                "stability_bonus": 1.0,
+                "building_efficiency_bonus": {"light_manufacturing": 0.03, "farming": 0.03},
+                "wealth_production_bonus": -0.02,
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 1.0, "building_efficiency_bonus": {"light_manufacturing": 0.02}},
+                "corporate": {"stability_penalty": -1.5},
+            },
+            "trait_modifiers": {
+                "collectivist": {"stability_bonus": 0.5, "integration_bonus": 0.02},
+                "individualist": {"stability_penalty": -1.0},
+            },
+        },
+        3: {  # free_labour
+            "base": {
+                "wealth_production_bonus": 0.04,
+                "growth_bonus": 0.0003,
+                "stability_penalty": -0.5,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.03},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_bonus": 0.5},
+                "individualist": {"wealth_production_bonus": 0.02},
+            },
+        },
+    },
+
+    "banking_policy": {
+        0: {  # no_banking
+            "base": {
+                "wealth_production_bonus": -0.05,
+                "building_efficiency_bonus": {"financial": -0.08},
+                "stability_bonus": 0.5,
+            },
+            "government_modifiers": {
+                "tribal": {"stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "traditionalist": {"stability_bonus": 0.5},
+            },
+        },
+        1: {"base": {}},  # state_banking (default)
+        2: {  # regulated_banking
+            "base": {
+                "wealth_production_bonus": 0.03,
+                "building_efficiency_bonus": {"financial": 0.04},
+                "land_trade_capacity": 75,
+            },
+            "government_modifiers": {
+                "democracy": {"stability_bonus": 0.5},
+                "corporate": {"wealth_production_bonus": 0.02},
+            },
+        },
+        3: {  # free_banking
+            "base": {
+                "wealth_production_bonus": 0.05,
+                "building_efficiency_bonus": {"financial": 0.06},
+                "land_trade_capacity": 150,
+                "stability_penalty": -0.5,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.03, "stability_bonus": 0.5},
+                "commune": {"stability_penalty": -1.5},
+            },
+            "trait_modifiers": {
+                "individualist": {"wealth_production_bonus": 0.02},
+                "collectivist": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "resource_extraction": {
+        0: {  # state_extraction
+            "base": {
+                "building_efficiency_bonus": {"extraction": 0.05},
+                "integration_bonus": 0.03,
+                "wealth_production_bonus": -0.03,
+            },
+            "government_modifiers": {
+                "autocracy": {"building_efficiency_bonus": {"extraction": 0.03}},
+                "commune": {"integration_bonus": 0.02},
+            },
+            "trait_modifiers": {
+                "collectivist": {"integration_bonus": 0.02},
+            },
+        },
+        1: {"base": {}},  # licensed_extraction (default)
+        2: {  # unregulated_extraction
+            "base": {
+                "building_efficiency_bonus": {"extraction": 0.06},
+                "wealth_production_bonus": 0.03,
+                "stability_penalty": -0.5,
+                "growth_penalty": -0.0002,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.02},
+            },
+            "trait_modifiers": {
+                "industrialist": {"building_efficiency_bonus": {"extraction": 0.03}},
+                "ecologist": {"stability_penalty": -2.0},
+            },
+        },
+        3: {  # conservation_priority
+            "base": {
+                "building_efficiency_bonus": {"extraction": -0.06, "green_energy": 0.04},
+                "stability_bonus": 0.5,
+                "farming_bonus": 0.03,
+                "growth_bonus": 0.0002,
+            },
+            "trait_modifiers": {
+                "ecologist": {"stability_bonus": 1.0, "farming_bonus": 0.02},
+                "industrialist": {"stability_penalty": -1.5},
+            },
+        },
+    },
+
+    "food_distribution": {
+        0: {  # free_market_food
+            "base": {
+                "wealth_production_bonus": 0.02,
+                "food_production_bonus": -0.03,
+                "land_trade_capacity": 50,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": 0.02},
+            },
+            "trait_modifiers": {
+                "individualist": {"wealth_production_bonus": 0.01},
+            },
+        },
+        1: {"base": {}},  # subsidised_food (default)
+        2: {  # rationing
+            "base": {
+                "food_production_bonus": 0.04,
+                "stability_penalty": -1.0,
+                "growth_bonus": 0.0003,
+                "upkeep_reduction": 0.03,
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 1.0},
+                "junta": {"stability_bonus": 0.5},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"stability_bonus": 0.5},
+                "libertarian": {"stability_penalty": -2.0},
+            },
+        },
+        3: {  # communal_kitchens
+            "base": {
+                "food_production_bonus": 0.03,
+                "stability_bonus": 0.5,
+                "growth_bonus": 0.0004,
+                "farming_bonus": 0.02,
+                "stability_recovery_bonus": 0.05,
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 1.0, "growth_bonus": 0.0002},
+                "corporate": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "collectivist": {"stability_bonus": 0.5, "farming_bonus": 0.01},
+                "individualist": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "infrastructure_policy": {
+        0: {  # neglected_infrastructure
+            "base": {
+                "march_speed_bonus": -0.05,
+                "building_efficiency_bonus": {"transport": -0.05},
+                "upkeep_reduction": 0.03,
+                "river_transit_speed": -0.03,
+            },
+        },
+        1: {"base": {}},  # maintained_infrastructure (default)
+        2: {  # expanding_infrastructure
+            "base": {
+                "building_efficiency_bonus": {"transport": 0.04, "construction": 0.04},
+                "march_speed_bonus": 0.03,
+                "upkeep_reduction": -0.03,
+                "sea_transit_speed": 0.02,
+                "river_transit_speed": 0.02,
+            },
+            "trait_modifiers": {
+                "industrialist": {"building_efficiency_bonus": {"construction": 0.03}},
+            },
+        },
+        3: {  # megaproject_infrastructure
+            "base": {
+                "building_efficiency_bonus": {"transport": 0.08, "construction": 0.08},
+                "march_speed_bonus": 0.06,
+                "upkeep_reduction": -0.06,
+                "stability_penalty": -1.0,
+                "sea_transit_speed": 0.04,
+                "river_transit_speed": 0.04,
+                "air_transit_speed": 0.03,
+            },
+            "government_modifiers": {
+                "autocracy": {"stability_bonus": 1.0},
+                "junta": {"stability_bonus": 1.0, "building_efficiency_bonus": {"construction": 0.03}},
+                "democracy": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "industrialist": {"building_efficiency_bonus": {"construction": 0.05}},
+                "authoritarian": {"stability_bonus": 0.5},
+                "ecologist": {"stability_penalty": -2.0},
+            },
+        },
+    },
+
+    "energy_policy": {
+        0: {  # biomass_energy
+            "base": {
+                "building_efficiency_bonus": {"refining": -0.05, "green_energy": -0.04},
+                "food_production_bonus": -0.02,
+                "rural_output_bonus": 0.02,
+            },
+            "trait_modifiers": {
+                "traditionalist": {"stability_bonus": 0.5},
+                "ecologist": {"stability_bonus": 0.5},
+            },
+        },
+        1: {  # fossil_fuel_energy
+            "base": {
+                "building_efficiency_bonus": {"refining": 0.05, "heavy_manufacturing": 0.03},
+            },
+            "trait_modifiers": {
+                "industrialist": {"building_efficiency_bonus": {"refining": 0.03}},
+                "ecologist": {"stability_penalty": -1.5},
+            },
+        },
+        2: {"base": {}},  # mixed_energy (default)
+        3: {  # renewable_energy
+            "base": {
+                "building_efficiency_bonus": {"green_energy": 0.08},
+                "stability_bonus": 0.5,
+                "upkeep_reduction": -0.02,
+            },
+            "trait_modifiers": {
+                "ecologist": {"stability_bonus": 1.0, "building_efficiency_bonus": {"green_energy": 0.05}},
+                "industrialist": {"stability_penalty": -1.0},
+                "modern": {"building_efficiency_bonus": {"green_energy": 0.03}},
+            },
+        },
+    },
+
+    # =========================================================================
+    # INDUSTRY & PRODUCTION (8 categories)
+    # =========================================================================
+    "industrial_policy": {
+        0: {  # agrarian_focus
+            "base": {
+                "food_production_bonus": 0.05,
+                "building_efficiency_bonus": {"farming": 0.06, "heavy_manufacturing": -0.04, "light_manufacturing": -0.04},
+                "farming_bonus": 0.04,
+                "rural_output_bonus": 0.04,
+                "urban_output_bonus": -0.03,
+            },
+            "government_modifiers": {
+                "tribal": {"food_production_bonus": 0.03, "stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "traditionalist": {"food_production_bonus": 0.03},
+                "ecologist": {"building_efficiency_bonus": {"farming": 0.04}},
+                "industrialist": {"stability_penalty": -1.5},
+            },
+        },
+        1: {"base": {}},  # balanced_development (default)
+        2: {  # industrialisation_drive
+            "base": {
+                "building_efficiency_bonus": {"heavy_manufacturing": 0.06, "light_manufacturing": 0.04, "construction": 0.04},
+                "food_production_bonus": -0.03,
+                "stability_penalty": -1.0,
+                "urban_threshold_reduction": 5000,
+                "urban_output_bonus": 0.04,
+            },
+            "government_modifiers": {
+                "autocracy": {"building_efficiency_bonus": {"heavy_manufacturing": 0.03}},
+                "junta": {"building_efficiency_bonus": {"construction": 0.03}},
+                "corporate": {"building_efficiency_bonus": {"light_manufacturing": 0.03}},
+            },
+            "trait_modifiers": {
+                "industrialist": {"building_efficiency_bonus": {"heavy_manufacturing": 0.05}, "stability_bonus": 1.0},
+                "ecologist": {"stability_penalty": -3.0},
+                "modern": {"building_efficiency_bonus": {"light_manufacturing": 0.02}},
+            },
+        },
+        3: {  # high_tech_focus
+            "base": {
+                "research_bonus": 0.08,
+                "building_efficiency_bonus": {"communications": 0.05, "pharmaceutical": 0.04},
+                "food_production_bonus": -0.03,
+                "upkeep_reduction": -0.03,
+                "urban_output_bonus": 0.06,
+            },
+            "government_modifiers": {
+                "corporate": {"research_bonus": 0.03},
+                "tribal": {"stability_penalty": -2.0},
+            },
+            "trait_modifiers": {
+                "positivist": {"research_bonus": 0.05},
+                "modern": {"research_bonus": 0.03, "building_efficiency_bonus": {"communications": 0.03}},
+                "traditionalist": {"stability_penalty": -2.0, "research_penalty": -0.03},
+            },
+        },
+    },
+
+    "construction_regulation": {
+        0: {  # no_regulations
+            "base": {
+                "construction_cost_reduction": 0.08,
+                "construction_time_reduction": 0.10,
+                "stability_penalty": -0.5,
+                "building_efficiency_bonus": {"construction": 0.04},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_bonus": 0.5},
+            },
+        },
+        1: {"base": {}},  # basic_codes (default)
+        2: {  # comprehensive_planning
+            "base": {
+                "construction_cost_reduction": -0.05,
+                "construction_time_reduction": -0.05,
+                "building_efficiency_bonus": {"construction": 0.04, "government_regulatory": 0.04},
+                "stability_bonus": 0.5,
+            },
+            "trait_modifiers": {
+                "authoritarian": {"building_efficiency_bonus": {"construction": 0.02}},
+            },
+        },
+    },
+
+    "environmental_policy": {
+        0: {  # no_environmental
+            "base": {
+                "building_efficiency_bonus": {"extraction": 0.05, "refining": 0.04, "green_energy": -0.06},
+                "growth_penalty": -0.0003,
+                "stability_penalty": -0.5,
+            },
+            "trait_modifiers": {
+                "ecologist": {"stability_penalty": -3.0},
+                "industrialist": {"building_efficiency_bonus": {"extraction": 0.03}},
+            },
+        },
+        1: {"base": {}},  # basic_environmental (default)
+        2: {  # strict_environmental
+            "base": {
+                "building_efficiency_bonus": {"extraction": -0.04, "green_energy": 0.05},
+                "growth_bonus": 0.0002,
+                "stability_bonus": 0.5,
+                "farming_bonus": 0.02,
+            },
+            "trait_modifiers": {
+                "ecologist": {"stability_bonus": 1.0, "building_efficiency_bonus": {"green_energy": 0.04}},
+                "industrialist": {"stability_penalty": -1.5, "building_efficiency_bonus": {"extraction": -0.02}},
+            },
+        },
+        3: {  # deep_ecology
+            "base": {
+                "building_efficiency_bonus": {"extraction": -0.10, "refining": -0.08, "green_energy": 0.10},
+                "growth_bonus": 0.0003,
+                "stability_penalty": -1.0,
+                "farming_bonus": 0.04,
+                "rural_output_bonus": 0.05,
+                "urban_growth_penalty": -0.0005,
+            },
+            "government_modifiers": {
+                "corporate": {"stability_penalty": -3.0},
+                "tribal": {"stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "ecologist": {"stability_bonus": 3.0, "building_efficiency_bonus": {"green_energy": 0.06}},
+                "industrialist": {"stability_penalty": -5.0},
+                "modern": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "agriculture_policy": {
+        0: {  # subsistence_farming
+            "base": {
+                "food_production_bonus": 0.04,
+                "building_efficiency_bonus": {"farming": -0.05},
+                "stability_bonus": 0.5,
+                "farming_bonus": 0.03,
+                "rural_output_bonus": 0.03,
+            },
+            "government_modifiers": {
+                "tribal": {"food_production_bonus": 0.03, "stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "traditionalist": {"stability_bonus": 0.5},
+            },
+        },
+        1: {"base": {}},  # mixed_agriculture (default)
+        2: {  # collective_farms
+            "base": {
+                "building_efficiency_bonus": {"farming": 0.05},
+                "food_production_bonus": 0.03,
+                "stability_penalty": -1.0,
+                "farming_bonus": 0.04,
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 2.0, "food_production_bonus": 0.03},
+                "democracy": {"stability_penalty": -1.0},
+                "corporate": {"stability_penalty": -2.0},
+            },
+            "trait_modifiers": {
+                "collectivist": {"stability_bonus": 1.5, "building_efficiency_bonus": {"farming": 0.03}},
+                "individualist": {"stability_penalty": -2.0},
+            },
+        },
+        3: {  # industrial_agriculture
+            "base": {
+                "building_efficiency_bonus": {"farming": 0.08, "chemical": 0.03},
+                "food_production_bonus": 0.06,
+                "upkeep_reduction": -0.02,
+                "farming_bonus": 0.06,
+            },
+            "government_modifiers": {
+                "corporate": {"building_efficiency_bonus": {"farming": 0.03}},
+            },
+            "trait_modifiers": {
+                "industrialist": {"building_efficiency_bonus": {"farming": 0.04}},
+                "ecologist": {"stability_penalty": -1.5},
+                "modern": {"building_efficiency_bonus": {"farming": 0.02}},
+            },
+        },
+    },
+
+    "manufacturing_policy": {
+        0: {  # cottage_industry
+            "base": {
+                "building_efficiency_bonus": {"light_manufacturing": -0.05, "heavy_manufacturing": -0.08},
+                "wealth_production_bonus": 0.02,
+                "rural_output_bonus": 0.02,
+            },
+            "trait_modifiers": {
+                "traditionalist": {"stability_bonus": 0.5},
+            },
+        },
+        1: {"base": {}},  # workshop_economy (default)
+        2: {  # factory_system
+            "base": {
+                "building_efficiency_bonus": {"light_manufacturing": 0.05, "heavy_manufacturing": 0.05},
+                "growth_penalty": -0.0002,
+                "urban_threshold_reduction": 3000,
+            },
+            "trait_modifiers": {
+                "industrialist": {"building_efficiency_bonus": {"heavy_manufacturing": 0.04}},
+                "ecologist": {"stability_penalty": -1.0},
+            },
+        },
+        3: {  # automated_production
+            "base": {
+                "building_efficiency_bonus": {"light_manufacturing": 0.08, "heavy_manufacturing": 0.08},
+                "research_bonus": 0.03,
+                "manpower_bonus": -0.05,
+                "upkeep_reduction": -0.03,
+                "urban_threshold_reduction": 5000,
+            },
+            "trait_modifiers": {
+                "modern": {"building_efficiency_bonus": {"light_manufacturing": 0.04}},
+                "traditionalist": {"stability_penalty": -1.5},
+                "industrialist": {"building_efficiency_bonus": {"heavy_manufacturing": 0.04}},
+            },
+        },
+    },
+
+    "research_policy": {
+        0: {  # no_research_policy
+            "base": {
+                "research_penalty": -0.05,
+                "literacy_bonus": -0.03,
+            },
+        },
+        1: {"base": {}},  # practical_research (default)
+        2: {  # academic_research
+            "base": {
+                "research_bonus": 0.08,
+                "upkeep_reduction": -0.03,
+                "literacy_bonus": 0.04,
+                "building_efficiency_bonus": {"government_education": 0.03},
+            },
+            "government_modifiers": {
+                "theocracy": {"research_bonus": -0.03},
+            },
+            "trait_modifiers": {
+                "positivist": {"research_bonus": 0.05},
+                "modern": {"research_bonus": 0.03},
+                "traditionalist": {"stability_penalty": -0.5},
+            },
+        },
+        3: {  # state_research
+            "base": {
+                "research_bonus": 0.06,
+                "building_efficiency_bonus": {"pharmaceutical": 0.03, "chemical": 0.03, "government_education": 0.04},
+            },
+            "government_modifiers": {
+                "autocracy": {"research_bonus": 0.03},
+                "junta": {"research_bonus": 0.02, "building_efficiency_bonus": {"chemical": 0.03}},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"research_bonus": 0.03},
+                "libertarian": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "salvage_policy": {
+        0: {  # free_salvage
+            "base": {
+                "building_efficiency_bonus": {"extraction": 0.05},
+                "stability_penalty": -0.5,
+            },
+        },
+        1: {"base": {}},  # regulated_salvage (default)
+        2: {  # state_salvage
+            "base": {
+                "research_bonus": 0.03,
+                "integration_bonus": 0.02,
+                "building_efficiency_bonus": {"extraction": 0.03},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"research_bonus": 0.02},
+            },
+        },
+    },
+
+    "technology_adoption": {
+        0: {  # tech_rejection
+            "base": {
+                "research_penalty": -0.08,
+                "stability_bonus": 1.0,
+                "building_efficiency_bonus": {"communications": -0.08, "pharmaceutical": -0.03},
+                "literacy_bonus": -0.03,
+            },
+            "trait_modifiers": {
+                "traditionalist": {"stability_bonus": 1.0},
+                "modern": {"stability_penalty": -3.0},
+            },
+        },
+        1: {"base": {}},  # cautious_adoption (default)
+        2: {  # enthusiastic_adoption
+            "base": {
+                "research_bonus": 0.05,
+                "building_efficiency_bonus": {"communications": 0.04, "pharmaceutical": 0.03},
+                "stability_penalty": -0.5,
+                "literacy_bonus": 0.03,
+                "urban_threshold_reduction": 3000,
+            },
+            "trait_modifiers": {
+                "modern": {"research_bonus": 0.03, "stability_bonus": 0.5},
+                "traditionalist": {"stability_penalty": -1.5},
+                "positivist": {"research_bonus": 0.03},
+            },
+        },
+    },
+
+    "rationing": {
+        0: {"base": {}},  # no_rationing (default) — effects handled by rationing system
+        1: {"base": {}},  # civilian_priority
+        2: {"base": {}},  # military_priority
+        3: {"base": {}},  # government_priority
+    },
+
+    # =========================================================================
+    # SOCIAL (12 categories)
+    # =========================================================================
+    "education_policy": {
+        0: {  # no_education
+            "base": {
+                "research_penalty": -0.08,
+                "upkeep_reduction": 0.03,
+                "literacy_bonus": -0.05,
+            },
+        },
+        1: {"base": {}},  # basic_education (default)
+        2: {  # primary_education
+            "base": {
+                "research_bonus": 0.03,
+                "upkeep_reduction": -0.02,
+                "literacy_bonus": 0.03,
+            },
+        },
+        3: {  # secondary_education
+            "base": {
+                "research_bonus": 0.06,
+                "upkeep_reduction": -0.04,
+                "building_efficiency_bonus": {"communications": 0.03},
+                "literacy_bonus": 0.05,
+            },
+            "trait_modifiers": {
+                "positivist": {"research_bonus": 0.03},
+                "egalitarian": {"stability_bonus": 0.5},
+            },
+        },
+        4: {  # universal_education
+            "base": {
+                "research_bonus": 0.10,
+                "upkeep_reduction": -0.06,
+                "building_efficiency_bonus": {"communications": 0.05, "pharmaceutical": 0.03},
+                "growth_bonus": 0.0002,
+                "literacy_bonus": 0.08,
+            },
+            "government_modifiers": {
+                "corporate": {"wealth_production_bonus": -0.02},
+                "commune": {"stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "positivist": {"research_bonus": 0.05},
+                "egalitarian": {"stability_bonus": 1.0, "research_bonus": 0.02},
+                "elitist": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "healthcare_policy": {
+        0: {  # no_healthcare
+            "base": {
+                "growth_penalty": -0.0005,
+                "upkeep_reduction": 0.02,
+            },
+        },
+        1: {"base": {}},  # basic_healthcare (default)
+        2: {  # public_healthcare
+            "base": {
+                "growth_bonus": 0.0003,
+                "stability_bonus": 0.5,
+                "upkeep_reduction": -0.03,
+            },
+            "trait_modifiers": {
+                "egalitarian": {"stability_bonus": 0.5},
+                "collectivist": {"stability_bonus": 0.5},
+            },
+        },
+        3: {  # universal_healthcare
+            "base": {
+                "growth_bonus": 0.0006,
+                "stability_bonus": 1.5,
+                "upkeep_reduction": -0.05,
+                "stability_recovery_bonus": 0.05,
+                "building_efficiency_bonus": {"healthcare": 0.04},
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 1.0},
+                "corporate": {"upkeep_reduction": -0.03},
+            },
+            "trait_modifiers": {
+                "egalitarian": {"stability_bonus": 1.0, "growth_bonus": 0.0002},
+                "collectivist": {"stability_bonus": 1.0},
+                "libertarian": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "housing_policy": {
+        0: {"base": {"upkeep_reduction": 0.02}},
+        1: {"base": {"upkeep_reduction": -0.01, "stability_bonus": 0.3}},
+        2: {  # public_housing
+            "base": {
+                "upkeep_reduction": -0.03,
+                "stability_bonus": 0.5,
+                "growth_bonus": 0.0002,
+                "urban_threshold_reduction": 5000,
+            },
+        },
+        3: {  # assigned_housing
+            "base": {
+                "upkeep_reduction": -0.04,
+                "stability_bonus": 0.5,
+                "growth_bonus": 0.0003,
+                "urban_threshold_reduction": 8000,
+            },
+            "government_modifiers": {"commune": {"stability_bonus": 1.0}},
+            "trait_modifiers": {"collectivist": {"stability_bonus": 0.5}, "libertarian": {"stability_penalty": -1.5}},
+        },
+    },
+
+    "welfare_policy": {
+        0: {  # no_welfare
+            "base": {
+                "upkeep_reduction": 0.04,
+                "stability_penalty": -1.0,
+                "growth_penalty": -0.0003,
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_bonus": 0.5},
+                "egalitarian": {"stability_penalty": -2.0},
+            },
+        },
+        1: {"base": {}},  # minimal_welfare (default)
+        2: {  # moderate_welfare
+            "base": {
+                "stability_bonus": 0.5,
+                "growth_bonus": 0.0002,
+                "upkeep_reduction": -0.02,
+            },
+            "trait_modifiers": {
+                "egalitarian": {"stability_bonus": 0.5},
+                "collectivist": {"stability_bonus": 0.5},
+            },
+        },
+        3: {  # comprehensive_welfare
+            "base": {
+                "stability_bonus": 1.5,
+                "growth_bonus": 0.0004,
+                "upkeep_reduction": -0.05,
+                "stability_recovery_bonus": 0.04,
+                "building_efficiency_bonus": {"government_welfare": 0.04},
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 1.0},
+                "corporate": {"upkeep_reduction": -0.03},
+            },
+            "trait_modifiers": {
+                "egalitarian": {"stability_bonus": 1.0},
+                "collectivist": {"stability_bonus": 1.0},
+                "individualist": {"stability_penalty": -1.0},
+            },
+        },
+        4: {  # universal_income
+            "base": {
+                "stability_bonus": 2.0,
+                "growth_bonus": 0.0006,
+                "upkeep_reduction": -0.08,
+                "wealth_production_bonus": -0.03,
+                "building_efficiency_bonus": {"government_welfare": 0.06, "government_organization": 0.03},
+            },
+            "government_modifiers": {
+                "commune": {"stability_bonus": 2.0},
+                "corporate": {"stability_penalty": -3.0, "upkeep_reduction": -0.05},
+            },
+            "trait_modifiers": {
+                "egalitarian": {"stability_bonus": 2.0, "growth_bonus": 0.0003},
+                "collectivist": {"stability_bonus": 1.5},
+                "individualist": {"stability_penalty": -2.0},
+                "libertarian": {"stability_penalty": -1.0},
+            },
+        },
+    },
+
+    "religion_policy": {
+        0: {  # state_atheism
+            "base": {
+                "research_bonus": 0.03,
+                "building_efficiency_bonus": {"religious": -0.15},
+                "stability_penalty": -2.0,
+            },
+            "government_modifiers": {
+                "theocracy": {"stability_penalty": -10.0},
+                "commune": {"stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "spiritualist": {"stability_penalty": -5.0},
+                "positivist": {"stability_bonus": 1.0},
+            },
+        },
+        1: {  # secular_state
+            "base": {
+                "research_bonus": 0.02,
+                "stability_bonus": 0.5,
+            },
+            "government_modifiers": {
+                "theocracy": {"stability_penalty": -3.0},
+            },
+            "trait_modifiers": {
+                "positivist": {"stability_bonus": 0.5},
+                "spiritualist": {"stability_penalty": -1.0},
+            },
+        },
+        2: {"base": {}},  # religious_tolerance (default)
+        3: {  # state_religion
+            "base": {
+                "stability_bonus": 2.0,
+                "building_efficiency_bonus": {"religious": 0.08, "healthcare": 0.03},
+                "research_penalty": -0.03,
+            },
+            "government_modifiers": {
+                "theocracy": {"stability_bonus": 2.0, "building_efficiency_bonus": {"religious": 0.05}},
+                "corporate": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "spiritualist": {"stability_bonus": 2.0},
+                "positivist": {"stability_penalty": -2.0, "research_penalty": -0.02},
+            },
+        },
+        4: {  # theocratic_law
+            "base": {
+                "stability_bonus": 3.0,
+                "building_efficiency_bonus": {"religious": 0.12},
+                "research_penalty": -0.08,
+                "growth_bonus": 0.0005,
+            },
+            "government_modifiers": {
+                "theocracy": {"stability_bonus": 3.0, "building_efficiency_bonus": {"religious": 0.08}},
+                "democracy": {"stability_penalty": -5.0},
+                "corporate": {"stability_penalty": -3.0},
+                "junta": {"stability_penalty": -1.0},
+            },
+            "trait_modifiers": {
+                "spiritualist": {"stability_bonus": 3.0, "growth_bonus": 0.0003},
+                "positivist": {"stability_penalty": -4.0, "research_penalty": -0.05},
+                "libertarian": {"stability_penalty": -3.0},
+                "modern": {"stability_penalty": -2.0},
+            },
+        },
+    },
+
+    "press_freedom": {
+        0: {  # free_press
+            "base": {
+                "research_bonus": 0.03,
+                "stability_penalty": -0.5,
+                "literacy_bonus": 0.03,
+                "building_efficiency_bonus": {"communications": 0.03},
+            },
+            "government_modifiers": {
+                "democracy": {"stability_bonus": 1.5},
+                "autocracy": {"stability_penalty": -2.0},
+                "junta": {"stability_penalty": -2.0},
+            },
+            "trait_modifiers": {
+                "libertarian": {"stability_bonus": 1.0},
+                "authoritarian": {"stability_penalty": -1.5},
+            },
+        },
+        1: {"base": {}},  # regulated_press (default)
+        2: {  # censored_press
+            "base": {
+                "stability_bonus": 1.0,
+                "research_penalty": -0.02,
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -2.0},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"stability_bonus": 0.5},
+                "libertarian": {"stability_penalty": -2.0},
+            },
+        },
+        3: {  # state_media
+            "base": {
+                "stability_bonus": 2.0,
+                "research_penalty": -0.04,
+                "upkeep_reduction": -0.02,
+                "building_efficiency_bonus": {"communications": 0.04},
+            },
+            "government_modifiers": {
+                "democracy": {"stability_penalty": -4.0},
+                "autocracy": {"stability_bonus": 1.0},
+                "junta": {"stability_bonus": 1.0},
+            },
+            "trait_modifiers": {
+                "authoritarian": {"stability_bonus": 1.5},
+                "libertarian": {"stability_penalty": -4.0},
+                "positivist": {"research_penalty": -0.02},
+            },
+        },
+    },
+
+    "family_policy": {
+        0: {"base": {}},
+        1: {  # pro_natalist
+            "base": {
+                "growth_bonus": 0.0008,
+                "upkeep_reduction": -0.02,
+                "urban_growth_penalty": -0.0002,
+            },
+            "trait_modifiers": {"nationalist": {"growth_bonus": 0.0003}},
+        },
+        2: {  # family_planning
+            "base": {"growth_penalty": -0.0003, "research_bonus": 0.02, "literacy_bonus": 0.02},
+        },
+        3: {  # population_control
+            "base": {"growth_penalty": -0.001, "stability_penalty": -2.0},
+            "government_modifiers": {"democracy": {"stability_penalty": -3.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 1.0}, "libertarian": {"stability_penalty": -3.0}},
+        },
+    },
+
+    "policing_policy": {
+        0: {"base": {"stability_penalty": -0.5, "upkeep_reduction": 0.02}},
+        1: {"base": {}},  # local_police (default)
+        2: {  # national_police
+            "base": {
+                "stability_bonus": 0.5,
+                "upkeep_reduction": -0.02,
+                "building_efficiency_bonus": {"government_security": 0.04},
+            },
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}},
+        },
+        3: {  # military_police
+            "base": {
+                "stability_bonus": 1.0,
+                "upkeep_reduction": -0.03,
+                "growth_penalty": -0.0002,
+                "building_efficiency_bonus": {"government_security": 0.06},
+                "march_speed_bonus": 0.02,
+            },
+            "government_modifiers": {"junta": {"stability_bonus": 1.0}},
+            "trait_modifiers": {"militarist": {"stability_bonus": 0.5}, "libertarian": {"stability_penalty": -2.0}},
+        },
+    },
+
+    "prison_policy": {
+        0: {"base": {"stability_penalty": -0.5}},
+        1: {"base": {}},  # basic_prisons (default)
+        2: {"base": {"stability_bonus": 0.5, "growth_bonus": 0.0001, "upkeep_reduction": -0.01}},
+        3: {  # labour_camps
+            "base": {
+                "building_efficiency_bonus": {"construction": 0.03, "extraction": 0.03},
+                "stability_penalty": -1.5,
+            },
+            "government_modifiers": {"democracy": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "egalitarian": {"stability_penalty": -2.0}},
+        },
+    },
+
+    "war_policy": {
+        0: {  # absolute_pacifism
+            "base": {
+                "stability_bonus": 2.0,
+                "growth_bonus": 0.0005,
+                "army_combat_bonus": -0.10,
+                "navy_combat_bonus": -0.10,
+                "air_combat_bonus": -0.10,
+                "army_upkeep_reduction": 0.05,
+                "navy_upkeep_reduction": 0.05,
+                "air_upkeep_reduction": 0.05,
+            },
+            "trait_modifiers": {
+                "pacifist": {"stability_bonus": 2.0},
+                "militarist": {"stability_penalty": -5.0},
+            },
+        },
+        1: {  # defensive_war
+            "base": {
+                "stability_bonus": 1.0,
+                "army_combat_bonus": 0.02,
+            },
+            "trait_modifiers": {
+                "pacifist": {"stability_bonus": 0.5},
+            },
+        },
+        2: {"base": {}},  # just_war (default)
+        3: {  # preemptive_war
+            "base": {
+                "army_combat_bonus": 0.03,
+                "stability_penalty": -1.0,
+                "army_upkeep_reduction": -0.02,
+                "march_speed_bonus": 0.03,
+            },
+            "trait_modifiers": {
+                "militarist": {"army_combat_bonus": 0.03, "stability_bonus": 0.5},
+                "pacifist": {"stability_penalty": -3.0},
+            },
+        },
+        4: {  # total_war
+            "base": {
+                "army_combat_bonus": 0.06,
+                "navy_combat_bonus": 0.06,
+                "air_combat_bonus": 0.06,
+                "manpower_bonus": 0.10,
+                "stability_penalty": -3.0,
+                "growth_penalty": -0.001,
+                "wealth_production_bonus": -0.05,
+                "army_upkeep_reduction": -0.04,
+                "navy_upkeep_reduction": -0.04,
+                "air_upkeep_reduction": -0.04,
+            },
+            "government_modifiers": {
+                "junta": {"stability_bonus": 2.0, "army_combat_bonus": 0.03},
+                "democracy": {"stability_penalty": -4.0},
+            },
+            "trait_modifiers": {
+                "militarist": {"stability_bonus": 2.0, "army_combat_bonus": 0.05},
+                "pacifist": {"stability_penalty": -6.0},
+                "nationalist": {"stability_bonus": 1.0},
+            },
+        },
+    },
+
+    # =========================================================================
+    # GOVERNANCE (10 categories)
+    # =========================================================================
+    "government_transparency": {
+        0: {  # total_secrecy
+            "base": {"stability_penalty": -1.0, "upkeep_reduction": 0.03},
+            "government_modifiers": {"democracy": {"stability_penalty": -4.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 1.0}, "libertarian": {"stability_penalty": -3.0}},
+        },
+        1: {"base": {}},  # selective_disclosure (default)
+        2: {  # open_government
+            "base": {"stability_bonus": 1.0, "upkeep_reduction": -0.02, "research_bonus": 0.02},
+            "government_modifiers": {"democracy": {"stability_bonus": 1.5}, "autocracy": {"stability_penalty": -2.0}, "junta": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"libertarian": {"stability_bonus": 1.0}, "authoritarian": {"stability_penalty": -1.5}},
+        },
+    },
+
+    "corruption_policy": {
+        0: {"base": {"upkeep_reduction": -0.08, "integration_bonus": -0.05, "wealth_production_bonus": -0.03, "stability_penalty": -2.0}},
+        1: {"base": {"upkeep_reduction": -0.03, "stability_penalty": -0.5}},
+        2: {"base": {}},  # anti_corruption (default)
+        3: {
+            "base": {"upkeep_reduction": -0.02, "stability_bonus": 1.0, "integration_bonus": 0.03},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "honorable": {"stability_bonus": 1.0}},
+        },
+    },
+
+    "bureaucratic_structure": {
+        0: {  # minimal_bureaucracy
+            "base": {
+                "upkeep_reduction": 0.06,
+                "integration_bonus": -0.05,
+                "bureaucratic_capacity": -200,
+                "building_efficiency_bonus": {"government_regulatory": -0.04, "government_oversight": -0.04},
+            },
+            "trait_modifiers": {"libertarian": {"stability_bonus": 1.0}},
+        },
+        1: {"base": {}},  # functional_bureaucracy (default)
+        2: {
+            "base": {"upkeep_reduction": -0.04, "integration_bonus": 0.03, "bureaucratic_capacity": 200},
+            "trait_modifiers": {"authoritarian": {"integration_bonus": 0.02}},
+        },
+        3: {  # total_administration
+            "base": {
+                "upkeep_reduction": -0.08,
+                "integration_bonus": 0.06,
+                "bureaucratic_capacity": 500,
+                "stability_penalty": -1.0,
+                "wealth_production_bonus": -0.03,
+                "building_efficiency_bonus": {"government_regulatory": 0.05, "government_oversight": 0.05, "government_management": 0.05},
+            },
+            "government_modifiers": {"democracy": {"stability_penalty": -2.0}, "commune": {"stability_bonus": 1.0}, "autocracy": {"stability_bonus": 1.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 1.0, "integration_bonus": 0.03}, "libertarian": {"stability_penalty": -4.0}, "collectivist": {"stability_bonus": 1.0}},
+        },
+    },
+
+    "political_parties": {
+        0: {
+            "base": {"stability_penalty": -1.0},
+            "government_modifiers": {"democracy": {"stability_penalty": -5.0}, "autocracy": {"stability_bonus": 1.0}, "junta": {"stability_bonus": 1.0}},
+        },
+        1: {
+            "base": {"stability_penalty": -0.5, "integration_bonus": 0.02},
+            "government_modifiers": {"democracy": {"stability_penalty": -3.0}, "commune": {"stability_bonus": 1.0}, "autocracy": {"stability_bonus": 0.5}},
+        },
+        2: {"base": {}},  # limited_parties (default)
+        3: {
+            "base": {"stability_bonus": 1.0, "research_bonus": 0.02},
+            "government_modifiers": {"democracy": {"stability_bonus": 2.0}, "autocracy": {"stability_penalty": -2.0}, "junta": {"stability_penalty": -2.0}, "theocracy": {"stability_penalty": -1.0}},
+            "trait_modifiers": {"libertarian": {"stability_bonus": 1.0}, "authoritarian": {"stability_penalty": -1.5}},
+        },
+    },
+
+    "local_governance": {
+        0: {  # centralised
+            "base": {"integration_bonus": 0.05, "stability_penalty": -1.0, "rural_output_penalty": -0.02},
+            "government_modifiers": {"autocracy": {"stability_bonus": 1.0}, "junta": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5, "integration_bonus": 0.02}, "libertarian": {"stability_penalty": -2.0}},
+        },
+        1: {"base": {}},  # delegated (default)
+        2: {
+            "base": {"integration_bonus": -0.03, "stability_bonus": 1.0, "growth_bonus": 0.0002},
+            "government_modifiers": {"tribal": {"stability_bonus": 1.0}},
+            "trait_modifiers": {"libertarian": {"stability_bonus": 1.0}, "authoritarian": {"stability_penalty": -1.0}},
+        },
+        3: {  # federal
+            "base": {"integration_bonus": -0.05, "stability_bonus": 1.5, "growth_bonus": 0.0003, "research_bonus": 0.02, "rural_output_bonus": 0.03},
+            "government_modifiers": {"democracy": {"stability_bonus": 1.0}, "autocracy": {"stability_penalty": -3.0}, "junta": {"stability_penalty": -3.0}},
+            "trait_modifiers": {"libertarian": {"stability_bonus": 1.5}, "authoritarian": {"stability_penalty": -2.0}},
+        },
+    },
+
+    "succession_policy": {
+        0: {  # hereditary
+            "base": {"stability_bonus": 1.5, "bureaucratic_capacity": -100, "research_penalty": -0.03},
+            "government_modifiers": {"tribal": {"stability_bonus": 1.0}, "democracy": {"stability_penalty": -3.0}},
+            "trait_modifiers": {"traditionalist": {"stability_bonus": 1.0}, "modern": {"stability_penalty": -1.0}},
+        },
+        1: {"base": {}},  # appointed_successor (default)
+        2: {  # elected_leader
+            "base": {"stability_bonus": 0.5, "research_bonus": 0.02, "bureaucratic_capacity": 100},
+            "government_modifiers": {"democracy": {"stability_bonus": 1.0}, "autocracy": {"stability_penalty": -2.0}, "junta": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"egalitarian": {"stability_bonus": 0.5}},
+        },
+        3: {  # council_selected
+            "base": {"stability_bonus": 1.0, "integration_bonus": 0.02},
+            "government_modifiers": {"commune": {"stability_bonus": 0.5}, "tribal": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"collectivist": {"stability_bonus": 0.5}},
+        },
+    },
+
+    "civil_service": {
+        0: {  # patronage_system
+            "base": {"upkeep_reduction": -0.05, "integration_bonus": -0.03, "stability_penalty": -1.0, "building_efficiency_bonus": {"government_management": -0.04}},
+        },
+        1: {"base": {}},  # basic_civil_service (default)
+        2: {
+            "base": {"integration_bonus": 0.03, "bureaucratic_capacity": 100, "upkeep_reduction": -0.02},
+            "trait_modifiers": {"elitist": {"integration_bonus": 0.02}},
+        },
+        3: {  # technocratic_service
+            "base": {
+                "research_bonus": 0.04,
+                "integration_bonus": 0.04,
+                "bureaucratic_capacity": 200,
+                "upkeep_reduction": -0.03,
+                "building_efficiency_bonus": {"government_management": 0.05, "government_education": 0.03},
+                "literacy_bonus": 0.03,
+            },
+            "government_modifiers": {"tribal": {"stability_penalty": -1.5}},
+            "trait_modifiers": {"positivist": {"research_bonus": 0.03}, "modern": {"research_bonus": 0.02}, "elitist": {"integration_bonus": 0.02, "research_bonus": 0.02}, "traditionalist": {"stability_penalty": -1.0}},
+        },
+    },
+
+    "emergency_powers": {
+        0: {
+            "base": {},
+            "government_modifiers": {"junta": {"stability_penalty": -2.0}, "autocracy": {"stability_penalty": -1.0}},
+            "trait_modifiers": {"libertarian": {"stability_bonus": 1.0}},
+        },
+        1: {"base": {}},  # limited_emergency (default)
+        2: {
+            "base": {"stability_penalty": -0.5, "integration_bonus": 0.02},
+            "government_modifiers": {"democracy": {"stability_penalty": -1.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "libertarian": {"stability_penalty": -1.5}},
+        },
+        3: {  # permanent_emergency
+            "base": {"stability_penalty": -2.0, "integration_bonus": 0.05, "manpower_bonus": 0.08, "growth_penalty": -0.0005},
+            "government_modifiers": {"democracy": {"stability_penalty": -5.0}, "commune": {"stability_penalty": -2.0}, "autocracy": {"stability_bonus": 1.0}, "junta": {"stability_bonus": 2.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 2.0}, "libertarian": {"stability_penalty": -6.0}, "militarist": {"stability_bonus": 1.0, "manpower_bonus": 0.03}},
+        },
+    },
+
+    "diplomatic_stance": {
+        0: {  # isolationism
+            "base": {"stability_bonus": 1.0, "land_trade_capacity": -150, "naval_trade_capacity": -100, "air_trade_capacity": -50, "integration_bonus": 0.03},
+            "government_modifiers": {"tribal": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5}, "internationalist": {"stability_penalty": -2.0}},
+        },
+        1: {"base": {}},  # cautious_engagement (default)
+        2: {  # active_diplomacy
+            "base": {"land_trade_capacity": 100, "naval_trade_capacity": 75, "air_trade_capacity": 50, "wealth_production_bonus": 0.03},
+            "government_modifiers": {"democracy": {"wealth_production_bonus": 0.02}},
+            "trait_modifiers": {"internationalist": {"land_trade_capacity": 50}, "honorable": {"wealth_production_bonus": 0.01}},
+        },
+        3: {  # alliance_seeking
+            "base": {"land_trade_capacity": 150, "naval_trade_capacity": 100, "air_trade_capacity": 75, "wealth_production_bonus": 0.04, "upkeep_reduction": -0.03},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"internationalist": {"land_trade_capacity": 75, "naval_trade_capacity": 50}, "nationalist": {"stability_penalty": -1.5}},
+        },
+    },
+
+    "propaganda_policy": {
+        0: {"base": {}, "trait_modifiers": {"libertarian": {"stability_bonus": 0.5}}},
+        1: {"base": {"stability_bonus": 0.5}},
+        2: {  # state_messaging
+            "base": {"stability_bonus": 1.0, "upkeep_reduction": -0.02, "stability_recovery_bonus": 0.04},
+            "government_modifiers": {"democracy": {"stability_penalty": -1.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "libertarian": {"stability_penalty": -1.0}},
+        },
+        3: {  # total_propaganda
+            "base": {"stability_bonus": 3.0, "research_penalty": -0.05, "upkeep_reduction": -0.04, "stability_recovery_bonus": 0.06},
+            "government_modifiers": {"democracy": {"stability_penalty": -5.0}, "autocracy": {"stability_bonus": 2.0}, "junta": {"stability_bonus": 2.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 2.0}, "libertarian": {"stability_penalty": -5.0}, "positivist": {"research_penalty": -0.03}},
+        },
+    },
+
+    # =========================================================================
+    # CULTURE & IDENTITY (8 categories)
+    # =========================================================================
+    "cultural_policy": {
+        0: {"base": {}},
+        1: {  # cultural_preservation (default)
+            "base": {"stability_bonus": 0.5, "building_efficiency_bonus": {"entertainment": 0.03}},
+            "government_modifiers": {"theocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"traditionalist": {"stability_bonus": 0.5}},
+        },
+        2: {  # cultural_promotion
+            "base": {"stability_bonus": 1.0, "building_efficiency_bonus": {"entertainment": 0.04, "communications": 0.02}, "integration_bonus": 0.02},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5, "integration_bonus": 0.01}},
+        },
+        3: {  # cultural_revolution
+            "base": {"stability_penalty": -1.5, "research_bonus": 0.03, "building_efficiency_bonus": {"communications": 0.04}, "literacy_bonus": 0.02},
+            "government_modifiers": {"commune": {"stability_bonus": 1.0}, "theocracy": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"modern": {"research_bonus": 0.02}, "traditionalist": {"stability_penalty": -2.0}},
+        },
+    },
+
+    "language_policy": {
+        0: {"base": {"integration_bonus": -0.02}},
+        1: {"base": {}},  # official_language (default)
+        2: {  # multilingual
+            "base": {"stability_bonus": 0.5, "research_bonus": 0.02, "land_trade_capacity": 50, "naval_trade_capacity": 50, "literacy_bonus": 0.02},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"internationalist": {"research_bonus": 0.01, "land_trade_capacity": 25}},
+        },
+        3: {  # language_enforcement
+            "base": {"integration_bonus": 0.03, "stability_penalty": -1.0, "bureaucratic_capacity": 50},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5, "integration_bonus": 0.01}, "internationalist": {"stability_penalty": -1.0}},
+        },
+    },
+
+    "arts_policy": {
+        0: {"base": {"building_efficiency_bonus": {"entertainment": -0.04}}},
+        1: {  # arts_patronage (default)
+            "base": {"stability_bonus": 0.5, "building_efficiency_bonus": {"entertainment": 0.04}, "stability_recovery_bonus": 0.03},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.3}},
+        },
+        2: {  # state_art
+            "base": {"stability_bonus": 1.0, "building_efficiency_bonus": {"entertainment": 0.05}, "research_penalty": -0.02},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}, "democracy": {"stability_penalty": -1.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "libertarian": {"stability_penalty": -1.0}},
+        },
+    },
+
+    "historical_narrative": {
+        0: {"base": {}},
+        1: {  # preservation_narrative (default)
+            "base": {"research_bonus": 0.02, "building_efficiency_bonus": {"pharmaceutical": 0.02}},
+            "trait_modifiers": {"positivist": {"research_bonus": 0.01}},
+        },
+        2: {  # rebirth_narrative
+            "base": {"stability_bonus": 0.5, "growth_bonus": 0.0002, "urban_threshold_reduction": 3000},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"modern": {"growth_bonus": 0.0001, "urban_threshold_reduction": 2000}},
+        },
+        3: {  # glory_narrative
+            "base": {"stability_bonus": 1.0, "manpower_bonus": 0.04, "research_penalty": -0.02},
+            "government_modifiers": {"junta": {"stability_bonus": 0.5, "manpower_bonus": 0.02}, "autocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5, "manpower_bonus": 0.02}, "militarist": {"manpower_bonus": 0.02}},
+        },
+    },
+
+    "family_policy": {
+        # Already defined above in SOCIAL section
+    },
+
+    "youth_policy": {
+        0: {"base": {}},  # no_youth_policy (default)
+        1: {  # youth_education
+            "base": {"research_bonus": 0.02, "literacy_bonus": 0.03, "growth_bonus": 0.0002},
+            "government_modifiers": {"democracy": {"research_bonus": 0.01}},
+            "trait_modifiers": {"positivist": {"research_bonus": 0.01, "literacy_bonus": 0.01}, "egalitarian": {"growth_bonus": 0.0001}},
+        },
+        2: {  # youth_organisations
+            "base": {"stability_bonus": 1.0, "manpower_bonus": 0.04, "integration_bonus": 0.02},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5, "manpower_bonus": 0.02}},
+        },
+        3: {  # youth_militias
+            "base": {"manpower_bonus": 0.08, "army_training_speed_bonus": 0.05, "stability_penalty": -0.5, "research_penalty": -0.02},
+            "government_modifiers": {"junta": {"manpower_bonus": 0.03, "stability_bonus": 0.5}, "democracy": {"stability_penalty": -1.5}},
+            "trait_modifiers": {"militarist": {"army_training_speed_bonus": 0.03, "manpower_bonus": 0.02}, "pacifist": {"stability_penalty": -2.0}},
+        },
+    },
+
+    "gender_policy": {
+        0: {  # traditional_roles
+            "base": {"stability_bonus": 0.5, "growth_bonus": 0.0003, "manpower_bonus": -0.04, "research_penalty": -0.02},
+            "government_modifiers": {"theocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"traditionalist": {"stability_bonus": 0.5}, "egalitarian": {"stability_penalty": -1.5}},
+        },
+        1: {"base": {}},  # mixed_roles (default)
+        2: {  # full_equality
+            "base": {"manpower_bonus": 0.06, "research_bonus": 0.02, "growth_penalty": -0.0001},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}, "commune": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"egalitarian": {"stability_bonus": 0.5, "manpower_bonus": 0.02}, "modern": {"research_bonus": 0.01}, "traditionalist": {"stability_penalty": -1.0}},
+        },
+    },
+
+    "elder_policy": {
+        0: {"base": {"upkeep_reduction": 0.01}},
+        1: {"base": {}},  # basic_elder_care (default)
+        2: {  # elder_councils
+            "base": {"stability_bonus": 1.0, "research_bonus": 0.02, "stability_recovery_bonus": 0.03, "building_efficiency_bonus": {"government_oversight": 0.03}},
+            "government_modifiers": {"tribal": {"stability_bonus": 1.0}},
+            "trait_modifiers": {"traditionalist": {"stability_bonus": 0.5, "research_bonus": 0.01}, "modern": {"stability_penalty": -0.5}},
+        },
+    },
+
+    # =========================================================================
+    # PUBLIC ORDER (5 categories)
+    # =========================================================================
+    "assembly_rights": {
+        0: {  # free_assembly
+            "base": {"stability_penalty": -0.5, "research_bonus": 0.02, "growth_bonus": 0.0002},
+            "government_modifiers": {"democracy": {"stability_bonus": 1.0, "research_bonus": 0.01}, "autocracy": {"stability_penalty": -1.5}},
+            "trait_modifiers": {"libertarian": {"stability_bonus": 0.5}, "authoritarian": {"stability_penalty": -1.0}},
+        },
+        1: {"base": {}},  # regulated_assembly (default)
+        2: {
+            "base": {"stability_bonus": 0.5, "research_penalty": -0.02},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}, "democracy": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.3}, "libertarian": {"stability_penalty": -1.5}},
+        },
+        3: {  # no_assembly
+            "base": {"stability_bonus": 1.0, "research_penalty": -0.04, "growth_penalty": -0.0003, "building_efficiency_bonus": {"communications": -0.03}},
+            "government_modifiers": {"junta": {"stability_bonus": 1.0}, "democracy": {"stability_penalty": -4.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "libertarian": {"stability_penalty": -3.0}, "egalitarian": {"stability_penalty": -1.5}},
+        },
+    },
+
+    "curfew_policy": {
+        0: {"base": {}},  # no_curfew (default)
+        1: {"base": {"stability_bonus": 0.3, "stability_recovery_bonus": 0.02}},
+        2: {  # mandatory_curfew
+            "base": {"stability_bonus": 1.0, "stability_recovery_bonus": 0.05, "wealth_production_bonus": -0.03, "building_efficiency_bonus": {"entertainment": -0.04}, "growth_penalty": -0.0002},
+            "government_modifiers": {"junta": {"stability_bonus": 0.5}, "democracy": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "libertarian": {"stability_penalty": -2.0}},
+        },
+    },
+
+    "identity_documents": {
+        0: {"base": {"growth_bonus": 0.0002, "integration_bonus": -0.02, "bureaucratic_capacity": -50}, "trait_modifiers": {"libertarian": {"stability_bonus": 0.3}}},
+        1: {"base": {}},  # basic_registration (default)
+        2: {
+            "base": {"integration_bonus": 0.02, "bureaucratic_capacity": 75, "stability_bonus": 0.5},
+            "government_modifiers": {"autocracy": {"integration_bonus": 0.01}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.3}, "libertarian": {"stability_penalty": -0.5}},
+        },
+        3: {  # biometric_tracking
+            "base": {"integration_bonus": 0.04, "bureaucratic_capacity": 150, "stability_bonus": 1.0, "research_penalty": -0.02, "growth_penalty": -0.0002},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}, "democracy": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "modern": {"research_bonus": 0.02}, "libertarian": {"stability_penalty": -2.5}},
+        },
+    },
+
+    "drug_policy": {
+        0: {  # unregulated_drugs
+            "base": {"stability_penalty": -0.5, "wealth_production_bonus": 0.02, "building_efficiency_bonus": {"pharmaceutical": 0.03}, "growth_penalty": -0.0002},
+            "trait_modifiers": {"libertarian": {"stability_bonus": 0.5}},
+        },
+        1: {"base": {}},  # medical_only (default)
+        2: {  # total_prohibition
+            "base": {"stability_bonus": 0.5, "building_efficiency_bonus": {"pharmaceutical": -0.02}, "wealth_production_bonus": -0.01},
+            "government_modifiers": {"theocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.3}, "libertarian": {"stability_penalty": -1.0}, "spiritualist": {"stability_bonus": 0.5}},
+        },
+    },
+
+    "justice_system": {
+        0: {  # tribal_justice
+            "base": {"stability_bonus": 0.5, "bureaucratic_capacity": -75, "upkeep_reduction": 0.02},
+            "government_modifiers": {"tribal": {"stability_bonus": 1.0}},
+            "trait_modifiers": {"traditionalist": {"stability_bonus": 0.5}, "modern": {"stability_penalty": -1.0}},
+        },
+        1: {"base": {}},  # codified_law (default)
+        2: {  # restorative_justice
+            "base": {"stability_bonus": 0.5, "growth_bonus": 0.0002, "stability_recovery_bonus": 0.04},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"egalitarian": {"stability_bonus": 0.5, "growth_bonus": 0.0001}, "authoritarian": {"stability_penalty": -0.5}},
+        },
+        3: {  # harsh_penalties
+            "base": {"stability_bonus": 1.0, "growth_penalty": -0.0003, "manpower_bonus": 0.03},
+            "government_modifiers": {"junta": {"stability_bonus": 0.5}, "democracy": {"stability_penalty": -1.5}},
+            "trait_modifiers": {"authoritarian": {"stability_bonus": 0.5}, "egalitarian": {"stability_penalty": -1.0}},
+        },
+    },
+
+    # =========================================================================
+    # FOREIGN RELATIONS (5 categories)
+    # =========================================================================
+    "alliance_policy": {
+        0: {
+            "base": {"stability_bonus": 0.5, "army_upkeep_reduction": 0.03, "navy_upkeep_reduction": 0.03, "air_upkeep_reduction": 0.03},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5}},
+        },
+        1: {"base": {}},  # defensive_pacts (default)
+        2: {
+            "base": {"army_combat_bonus": 0.03, "navy_combat_bonus": 0.03, "air_combat_bonus": 0.03, "army_upkeep_reduction": -0.02, "navy_upkeep_reduction": -0.02, "stability_penalty": -0.5},
+            "government_modifiers": {"junta": {"army_combat_bonus": 0.02}},
+            "trait_modifiers": {"militarist": {"army_combat_bonus": 0.02, "navy_combat_bonus": 0.01}, "pacifist": {"stability_penalty": -1.0}},
+        },
+        3: {  # federation_seeking
+            "base": {"land_trade_capacity": 100, "naval_trade_capacity": 75, "integration_bonus": 0.03, "upkeep_reduction": -0.03},
+            "government_modifiers": {"democracy": {"stability_bonus": 1.0}, "autocracy": {"stability_penalty": -2.0}},
+            "trait_modifiers": {"internationalist": {"land_trade_capacity": 50, "integration_bonus": 0.02}, "nationalist": {"stability_penalty": -2.0}},
+        },
+    },
+
+    "foreign_aid": {
+        0: {"base": {}},  # no_foreign_aid (default)
+        1: {
+            "base": {"wealth_production_bonus": -0.02, "land_trade_capacity": 50, "stability_bonus": 0.3},
+            "government_modifiers": {"corporate": {"wealth_production_bonus": 0.01}},
+            "trait_modifiers": {"devious": {"stability_bonus": 0.3}},
+        },
+        2: {
+            "base": {"wealth_production_bonus": -0.04, "stability_bonus": 1.0, "growth_bonus": 0.0002},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}, "commune": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"internationalist": {"stability_bonus": 0.5}, "egalitarian": {"stability_bonus": 0.3}, "nationalist": {"stability_penalty": -1.0}},
+        },
+    },
+
+    "treaty_compliance": {
+        0: {
+            "base": {"stability_penalty": -0.5, "wealth_production_bonus": 0.02},
+            "trait_modifiers": {"devious": {"wealth_production_bonus": 0.02}, "honorable": {"stability_penalty": -2.0}},
+        },
+        1: {"base": {}},  # treaty_respected (default)
+        2: {
+            "base": {"stability_bonus": 1.0, "land_trade_capacity": 75, "naval_trade_capacity": 50},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.3}},
+            "trait_modifiers": {"honorable": {"stability_bonus": 1.0, "land_trade_capacity": 50}, "devious": {"stability_penalty": -1.5}},
+        },
+    },
+
+    "espionage_stance": {
+        0: {"base": {"stability_bonus": 0.5, "upkeep_reduction": 0.02}, "trait_modifiers": {"pacifist": {"stability_bonus": 0.3}}},
+        1: {"base": {}},  # defensive_espionage (default)
+        2: {
+            "base": {"building_efficiency_bonus": {"government_security": 0.04}, "stability_penalty": -0.5, "upkeep_reduction": -0.02},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"devious": {"building_efficiency_bonus": {"government_security": 0.02}}, "honorable": {"stability_penalty": -1.0}},
+        },
+        3: {  # aggressive_espionage
+            "base": {"building_efficiency_bonus": {"government_security": 0.06}, "stability_penalty": -1.5, "upkeep_reduction": -0.04, "army_combat_bonus": 0.02},
+            "government_modifiers": {"autocracy": {"stability_bonus": 1.0}, "junta": {"stability_bonus": 0.5, "army_combat_bonus": 0.01}, "democracy": {"stability_penalty": -3.0}},
+            "trait_modifiers": {"devious": {"stability_bonus": 1.0, "army_combat_bonus": 0.01}, "honorable": {"stability_penalty": -3.0}, "authoritarian": {"stability_bonus": 0.5}},
+        },
+    },
+
+    # =========================================================================
+    # REMAINING SOCIAL (6 categories)
+    # =========================================================================
+    "citizenship_policy": {
+        0: {
+            "base": {"growth_bonus": 0.0006, "stability_penalty": -0.5, "integration_bonus": -0.02},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"internationalist": {"growth_bonus": 0.0002}, "nationalist": {"stability_penalty": -1.5}},
+        },
+        1: {"base": {}},  # residency_citizenship (default)
+        2: {
+            "base": {"stability_bonus": 0.5, "integration_bonus": 0.02, "growth_penalty": -0.0003},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5, "integration_bonus": 0.01}, "internationalist": {"stability_penalty": -0.5}},
+        },
+        3: {  # merit_citizenship
+            "base": {"research_bonus": 0.02, "wealth_production_bonus": 0.02, "bureaucratic_capacity": 75},
+            "government_modifiers": {"corporate": {"wealth_production_bonus": 0.02}},
+            "trait_modifiers": {"elitist": {"research_bonus": 0.02}, "egalitarian": {"stability_penalty": -1.0}},
+        },
+    },
+
+    "migration_policy": {
+        0: {
+            "base": {"growth_bonus": 0.0008, "stability_penalty": -0.5, "urban_threshold_reduction": 5000},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"internationalist": {"growth_bonus": 0.0002}, "nationalist": {"stability_penalty": -2.0}},
+        },
+        1: {"base": {}},  # accept_migrants (default)
+        2: {
+            "base": {"stability_bonus": 0.5, "growth_penalty": -0.0002, "integration_bonus": 0.02},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.3}},
+        },
+        3: {
+            "base": {"stability_bonus": 1.0, "growth_penalty": -0.0005, "integration_bonus": 0.04},
+            "government_modifiers": {"autocracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5}, "internationalist": {"stability_penalty": -1.5}},
+        },
+    },
+
+    "social_mobility": {
+        0: {  # caste_system
+            "base": {"stability_bonus": 1.0, "research_penalty": -0.03, "growth_penalty": -0.0002, "building_efficiency_bonus": {"government_management": 0.03}},
+            "government_modifiers": {"theocracy": {"stability_bonus": 0.5}, "democracy": {"stability_penalty": -3.0}},
+            "trait_modifiers": {"traditionalist": {"stability_bonus": 0.5}, "egalitarian": {"stability_penalty": -3.0}},
+        },
+        1: {"base": {}},  # limited_mobility (default)
+        2: {
+            "base": {"research_bonus": 0.03, "wealth_production_bonus": 0.02, "building_efficiency_bonus": {"government_education": 0.04}},
+            "government_modifiers": {"corporate": {"wealth_production_bonus": 0.02}},
+            "trait_modifiers": {"elitist": {"research_bonus": 0.02}, "modern": {"research_bonus": 0.01}},
+        },
+        3: {  # egalitarian_mobility
+            "base": {"stability_bonus": 1.0, "growth_bonus": 0.0003, "research_penalty": -0.02, "rural_output_bonus": 0.03},
+            "government_modifiers": {"commune": {"stability_bonus": 1.0, "growth_bonus": 0.0001}, "corporate": {"stability_penalty": -1.5}},
+            "trait_modifiers": {"egalitarian": {"stability_bonus": 0.5, "growth_bonus": 0.0001}, "elitist": {"stability_penalty": -1.5}, "collectivist": {"stability_bonus": 0.5}},
+        },
+    },
+
+    "minority_rights": {
+        0: {
+            "base": {"stability_penalty": -1.0, "manpower_bonus": 0.04, "growth_penalty": -0.0005, "research_penalty": -0.03},
+            "government_modifiers": {"junta": {"stability_bonus": 0.5}, "democracy": {"stability_penalty": -3.0}},
+            "trait_modifiers": {"nationalist": {"stability_bonus": 0.5}, "egalitarian": {"stability_penalty": -3.0}, "internationalist": {"stability_penalty": -2.0}},
+        },
+        1: {"base": {}},  # tolerance (default)
+        2: {
+            "base": {"stability_bonus": 0.5, "growth_bonus": 0.0002, "research_bonus": 0.02},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"internationalist": {"stability_bonus": 0.3}},
+        },
+        3: {
+            "base": {"stability_bonus": 1.0, "growth_bonus": 0.0003, "research_bonus": 0.03, "literacy_bonus": 0.02},
+            "government_modifiers": {"democracy": {"stability_bonus": 0.5}, "commune": {"stability_bonus": 0.5}},
+            "trait_modifiers": {"egalitarian": {"stability_bonus": 1.0}, "internationalist": {"stability_bonus": 0.5, "research_bonus": 0.01}, "nationalist": {"stability_penalty": -1.5}},
+        },
+    },
+}
+
+# family_policy was duplicated in the SOCIAL section — remove the empty CULTURE stub
+# (The real entry is in the SOCIAL block above)
+POLICY_EFFECTS.pop("family_policy", None)
+POLICY_EFFECTS["family_policy"] = {
+    0: {"base": {}},
+    1: {  # pro_natalist
+        "base": {"growth_bonus": 0.0008, "upkeep_reduction": -0.02, "urban_growth_penalty": -0.0002},
+        "trait_modifiers": {"nationalist": {"growth_bonus": 0.0003}},
+    },
+    2: {"base": {"growth_penalty": -0.0003, "research_bonus": 0.02, "literacy_bonus": 0.02}},
+    3: {
+        "base": {"growth_penalty": -0.001, "stability_penalty": -2.0},
+        "government_modifiers": {"democracy": {"stability_penalty": -3.0}},
+        "trait_modifiers": {"authoritarian": {"stability_bonus": 1.0}, "libertarian": {"stability_penalty": -3.0}},
+    },
+}
+
+
+# =============================================================================
+# POLICY_REQUIREMENTS — prerequisites to select a policy level
+#
+# Keys: (category, level_index) -> dict with optional keys:
+#   "government_types": list of allowed government types (must match one)
+#   "government_types_banned": list of banned government types
+#   "traits_required": list of trait keys (must have at least one)
+#   "traits_banned": list of trait keys (must not have any)
+#   "policies_required": list of (category, min_level) tuples
+# =============================================================================
+
+POLICY_REQUIREMENTS = {
+    ("intelligence_policy", 3): {"government_types_banned": ["democracy"]},
+    ("religion_policy", 4): {"government_types": ["theocracy"]},
+    ("religion_policy", 3): {"government_types_banned": ["commune"]},
+    ("religion_policy", 0): {"government_types_banned": ["theocracy"]},
+    ("economic_system", 3): {"government_types_banned": ["corporate"]},
+    ("military_spending", 4): {"policies_required": [("military_service", 2)]},
+    ("military_service", 6): {"policies_required": [("military_spending", 4), ("emergency_powers", 2)]},
+    ("military_service", 4): {"policies_required": [("military_spending", 2)]},
+    ("military_doctrine", 3): {"policies_required": [("manufacturing_policy", 2)]},
+    ("propaganda_policy", 3): {"policies_required": [("press_freedom", 2)]},
+    ("emergency_powers", 3): {"government_types_banned": ["democracy"]},
+    ("manufacturing_policy", 3): {"policies_required": [("research_policy", 2)]},
+    ("industrial_policy", 3): {"policies_required": [("education_policy", 3)]},
+    ("political_parties", 3): {"government_types_banned": ["autocracy", "junta"]},
+    ("political_parties", 0): {"government_types_banned": ["democracy"]},
+    ("currency_policy", 2): {"policies_required": [("banking_policy", 2)]},
+    ("prison_policy", 3): {"government_types_banned": ["democracy", "commune"]},
+    ("labour_policy", 0): {"government_types_banned": ["democracy"]},
+    ("war_policy", 4): {"policies_required": [("military_service", 3)]},
+    ("war_policy", 0): {"government_types_banned": ["junta"]},
+}
+
+
+# =============================================================================
+# POLICY_BANS — cross-policy incompatibilities
+#
+# When a nation has (category, level), the listed (category, level) combos
+# become unavailable.  Checked symmetrically: both sides are listed.
+# =============================================================================
+
+POLICY_BANS = {
+    ("war_policy", 0): [
+        ("military_spending", 4),
+        ("rationing", 2),
+        ("military_service", 3),
+        ("military_service", 4),
+        ("military_service", 5),
+        ("military_service", 6),
+    ],
+    ("military_spending", 4): [
+        ("war_policy", 0),
+        ("war_policy", 1),
+    ],
+    ("economic_system", 3): [
+        ("banking_policy", 3),
+        ("labour_policy", 3),
+        ("property_rights", 2),
+    ],
+    ("economic_system", 0): [
+        ("banking_policy", 1),
+        ("property_rights", 0),
+    ],
+    ("trade_policy", 3): [
+        ("alliance_policy", 3),
+    ],
+    ("propaganda_policy", 3): [
+        ("government_transparency", 2),
+    ],
+    ("government_transparency", 2): [
+        ("propaganda_policy", 3),
+        ("intelligence_policy", 3),
+    ],
+    ("military_service", 0): [
+        ("military_spending", 3),
+        ("military_spending", 4),
+        ("rationing", 2),
+    ],
+    ("religion_policy", 0): [
+        ("religion_policy", 3),
+        ("religion_policy", 4),
+    ],
+    ("religion_policy", 4): [
+        ("religion_policy", 0),
+        ("religion_policy", 1),
+        ("research_policy", 2),
+    ],
+    ("environmental_policy", 3): [
+        ("industrial_policy", 2),
+        ("resource_extraction", 2),
+        ("energy_policy", 1),
+    ],
+    ("environmental_policy", 0): [
+        ("resource_extraction", 3),
+    ],
+}
+
+
+# =============================================================================
+# BUILDING_POLICY_REQUIREMENTS — buildings that need specific policy levels
+#
+# Format: building_type -> list of (policy_category, min_level_index) tuples.
+# ALL requirements must be met (AND logic).
+# =============================================================================
+
+BUILDING_POLICY_REQUIREMENTS = {
+    "stock_exchange": [("banking_policy", 2)],
+    "bank": [("banking_policy", 1)],
+    "intelligence_agency": [("intelligence_policy", 2)],
+    "army_base": [("military_service", 1)],
+    "naval_base": [("military_service", 1)],
+    "air_base": [("military_service", 1)],
+    "weapons_factory": [("military_spending", 2)],
+    "industrial_complex": [("manufacturing_policy", 2)],
+    "electronics_factory": [("manufacturing_policy", 2)],
+    "precision_workshop": [("manufacturing_policy", 1)],
+    "research_institute": [("research_policy", 2)],
+    "university": [("education_policy", 3)],
+    "public_school": [("education_policy", 2)],
+    "broadcasting_station": [("press_freedom", 1)],
+    "advanced_refinery": [("energy_policy", 1)],
+    "biofuel_plant": [("energy_policy", 2)],
+    "wind_farm": [("environmental_policy", 1)],
+    "solar_array": [("environmental_policy", 1)],
+    "hydroelectric_dam": [("environmental_policy", 1)],
+    "hospital": [("healthcare_policy", 1)],
+    "sanitation_works": [("healthcare_policy", 1)],
+    "holy_site": [("religion_policy", 3)],
+    "infrastructure_bureau": [("infrastructure_policy", 2)],
+    "airport": [("infrastructure_policy", 2)],
+    "air_cargo_terminal": [("infrastructure_policy", 2)],
+    "railroad": [("infrastructure_policy", 2)],
+    "train_depot": [("infrastructure_policy", 2)],
+    "train_station": [("infrastructure_policy", 2)],
+    "train_cargo_terminal": [("infrastructure_policy", 2)],
+}
+
+
+# =============================================================================
+# BUILDING_POLICY_BANS — buildings blocked by specific policy levels
+#
+# Format: building_type -> list of (policy_category, exact_level) tuples.
+# ANY match blocks construction.
+# =============================================================================
+
+BUILDING_POLICY_BANS = {
+    "stock_exchange": [("economic_system", 3), ("economic_system", 4)],
+    "bank": [("economic_system", 4)],
+    "holy_site": [("religion_policy", 0)],
+    "church": [("religion_policy", 0)],
+    "madrasa": [("religion_policy", 0)],
+    "arms_factory": [("war_policy", 0)],
+    "weapons_factory": [("war_policy", 0)],
+    "army_base": [("military_service", 0)],
+    "naval_base": [("military_service", 0)],
+    "air_base": [("military_service", 0)],
+    "oil_well": [("environmental_policy", 3)],
+    "refinery": [("environmental_policy", 3)],
+    "advanced_refinery": [("environmental_policy", 3)],
+}
+
+
+# =============================================================================
+# UNIT_POLICY_REQUIREMENTS — unit types requiring specific policy levels
+#
+# Format: unit_type -> list of (policy_category, min_level) tuples.
+# ALL requirements must be met.
+# =============================================================================
+
+UNIT_POLICY_REQUIREMENTS = {
+    "militia": [],
+    "infantry": [("military_spending", 1)],
+    "motorized": [("military_spending", 2), ("manufacturing_policy", 2)],
+    "armored": [("military_spending", 3), ("manufacturing_policy", 2), ("industrial_policy", 2)],
+    "artillery": [("military_spending", 2), ("manufacturing_policy", 2)],
+    "patrol_boat": [("military_spending", 1)],
+    "frigate": [("military_spending", 3)],
+    "transport": [("military_spending", 2)],
+    "scout_plane": [("military_spending", 2)],
+    "fighter": [("military_spending", 3), ("manufacturing_policy", 2)],
+    "bomber": [("military_spending", 4), ("manufacturing_policy", 2), ("industrial_policy", 2)],
+}
+
+
+# =============================================================================
+# UNIT_POLICY_BANS — unit types blocked by specific policy levels
+#
+# Format: unit_type -> list of (policy_category, exact_level) tuples.
+# ANY match blocks training.
+# =============================================================================
+
+UNIT_POLICY_BANS = {
+    "militia": [("military_service", 0)],
+    "infantry": [("military_service", 0), ("war_policy", 0)],
+    "motorized": [("military_service", 0), ("war_policy", 0)],
+    "armored": [("military_service", 0), ("war_policy", 0)],
+    "artillery": [("military_service", 0), ("war_policy", 0)],
+    "patrol_boat": [("military_service", 0)],
+    "frigate": [("military_service", 0), ("war_policy", 0)],
+    "transport": [("military_service", 0)],
+    "scout_plane": [("military_service", 0)],
+    "fighter": [("military_service", 0), ("war_policy", 0)],
+    "bomber": [("military_service", 0), ("war_policy", 0)],
+}

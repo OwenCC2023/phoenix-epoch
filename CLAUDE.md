@@ -36,9 +36,9 @@ provinces/travel_constants.py    — travel speed constants, cross-type requirem
 provinces/travel.py              — get_march_time(), get_embark_time(), get_zone_travel_time(), check_cross_type_requirements()
 economy/constants.py             — FOOD_CONSUMPTION_PER_POP, stability penalties, government types
 nations/trait_constants.py       — 18 ideology traits in 9 pairs, trait effects, validation
-nations/policy_constants.py      — 66 policy categories, POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, building/unit blocks
-nations/policy_effects.py        — get_nation_policy_effects(), validate_policy_change(), get_policy_building_blocks(), get_policy_unit_blocks()
 nations/government_constants.py  — five-axis GOV_* dicts, GOV_COMPONENTS, get_combined_government_effects()
+nations/policy_constants.py      — 67 policy categories with discrete levels + POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, BUILDING_POLICY_REQUIREMENTS, BUILDING_POLICY_BANS, UNIT_POLICY_REQUIREMENTS, UNIT_POLICY_BANS
+nations/policy_effects.py        — get_nation_policy_effects(), validate_policy_change(), get_policy_building_blocks(), get_policy_unit_blocks()
 ```
 
 ---
@@ -135,12 +135,13 @@ Helper functions: `get_province_building_effects(province)` and `get_national_bu
 
 ### 1b. Building efficiency — multi-source modifier system
 
-`efficiency_mult = 1.0 + sum(all additive bonuses)` applied to building **output only** (not inputs). Five sources, each separately additive (source 2 replaced old ideology with trait bonuses):
+`efficiency_mult = 1.0 + sum(all additive bonuses)` applied to building **output only** (not inputs). Six sources, each separately additive:
 
 | # | Source | Where defined | Scope |
 |---|--------|--------------|-------|
 | 1 | **Government type** | `GOVERNMENT_TYPES["building_efficiency"]` | National, per category — 2-3 entries per government type |
 | 2 | **Trait bonuses** | `TRAIT_DEFS[trait]["*_effects"]["building_efficiency_bonus"]` | National, per category — varies by trait selection |
+| 2b | **Policy bonuses** | `POLICY_EFFECTS[cat][level]["base"]["building_efficiency_bonus"]` | National, per category — from active policy levels |
 | 3 | **GM crisis/boon** | `NationModifier(category="building_efficiency", target=…)` | National, target = category name or `"all"` |
 | 4 | **Input co-location** | `INPUT_COLOCATION_BONUS = 0.10` | Per-building: fires if ANY input good is locally available — either the province terrain's primary resource, or a good produced by another active building in the same province |
 | 5 | **Industry cluster** | `INDUSTRY_CLUSTER_BONUS = 0.05` | Per-building: +5% per other active same-category building in province |
@@ -217,9 +218,9 @@ Construction cost (all three, L1/L2/L3): ~5000 materials + 4000–16000 wealth; 
 
 **Stub effects (awaiting future systems):** trade_capacity, diplomatic_reputation, espionage, bureaucratic_capacity, happiness, literacy, military_organisation, etc.
 
-### 1d. Policies system
+### 1e. Policies system
 
-**What:** 66 policy categories, each with 2-10 discrete levels. One row per (nation, category) in `NationPolicy` model.
+**What:** 67 policy categories, each with 2-10 discrete levels. One row per (nation, category) in `NationPolicy` model. Policy effects are fully wired into the simulation and building system.
 
 **Key files:**
 - `nations/policy_constants.py` — `POLICY_CATEGORIES`, `POLICY_EFFECTS`, `POLICY_REQUIREMENTS`, `POLICY_BANS`, `BUILDING_POLICY_REQUIREMENTS`, `BUILDING_POLICY_BANS`, `UNIT_POLICY_REQUIREMENTS`, `UNIT_POLICY_BANS`
@@ -620,6 +621,8 @@ from provinces.jobs import get_province_job_status, calculate_province_designati
 from provinces.models import AirZone, SeaZone, RiverZone
 from provinces.travel import get_march_time, get_embark_time, get_zone_travel_time, check_cross_type_requirements
 from provinces.travel_constants import CROSS_TYPE_REQUIREMENTS, FREE_CROSS_TYPE_TRANSITIONS
+from nations.policy_effects import get_nation_policy_effects, validate_policy_change, get_policy_building_blocks, get_policy_unit_blocks
+from nations.policy_constants import POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, BUILDING_POLICY_REQUIREMENTS, BUILDING_POLICY_BANS, UNIT_POLICY_REQUIREMENTS, UNIT_POLICY_BANS
 print('OK')
 "
 ```

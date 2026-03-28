@@ -1,0 +1,85 @@
+Espionage System:
+
+Main Goal: Create a fun system that allows players to take actions to see information about foreign nations and take actions to protect their own information. 
+
+Components:
+	- Attack: Ability of a nation to view information foreign nations wish to be kept hidden. Ability to operate secretly within a foreign nation. Ability of external Actions on foreign soil.
+	- Defense: Ability of a nation to prevent others from gaining information. Ability to prevent foreign operatives from accomplishing their goals. Ability of internal Actions on own soil.
+	- Transparency: How much a foreign actor knows about the target nation and/or province.
+	- Actions: Specific orders that can be given within the Espionage system to accomplish a specific task. Will require specific levels of Attack or Defense to initialize.
+	- Buildings: Add Attack and Defense capacity through their operation. Higher levels unlock more powerful Actions.
+
+General Principles:
+	- The Attack value of the infiltrating nation is compared to the Defense value of the defending nation, and the Defense value of the province targeted for infiltration.
+	- Attack is always a national value.
+	- Defense is both a national and provincial value.
+		- Provincial Defense is the national +/- the provincial value.
+	- Transparency is a national, and a provincial value.
+		- Higher transparency means more information is known.
+		- See Transparency section for how to calculate. 
+
+Tie-ins with other systems:
+	- Buildings: [See Added Buildings section below].
+	- Policies [name: effects on Espionage system]:
+		- Policing: More institutionalized levels should contribute to National Defense. Less institutional should detract. Base: Town Watch.
+		- Anti-Corruption Policy: Lower penalties detract from National Defense. Base: Zero-tolerance. 
+		- Visa Policy: More stringent requirements contribute to National Defense. Less should detract. Base: Visa on Arrival.
+		- Naturalization Laws: More stringent requirements contribute to National Defense. Less should detract. Base: 4-7 Years.
+		- Domestic Intelligence Agency: Defense massively reduced if set to nonexistent. Higher levels boost defense.
+		- Foreign Intelligence Agency: Must not be nonexistent for Attack to be a value other than zero (0). Higher levels enable greater levels for Foreign Intel Agency HQ.
+		- Freedom of Movement: Fewer restrictions detract from National Defense. Base: Elites only.
+		- Freedom of Association: Fewer restrictions detract from National Defense. Base: Approved Organizations Only.
+		- Gender Rights: More rights adds to National Defense. Base: Homemakers.
+		- Racial Rights: More rights adds to National Defense. Base: Exclusivity.
+		- Social Discrimination: More discrimination detracts from National Defense. Base: Minimal.
+	- Ideologies [name: effects on Espionage system]:
+		- Authoritarian: Adds to National Defense.
+		- Honorable: Adds to National Defense.
+		- Devious: Adds to National Attack. Detracts from National Defense.
+		- Libertarian: Detracts from National Defense.
+	- Stability:
+		- Attack: Positive relative stability vs target nation adds to effective National Attack. Needs tiered breakpoints.
+		- Defense: Positive relative stability vs attacker adds to effective National Defense. Needs tiered breakpoints.
+		- Relative stability can only impart a positive modifier. 
+	- National Security:
+		- [See Existing Building Changes].
+	- Happiness:
+		- 
+	- Literacy:
+		- Defense: High relative literacy vs attacker adds to effective National Defense.
+
+Transparency:
+	- Calculated on the relative value of infiltrator National Attack value vs the target National Defense value.
+	- Expressed as the percentage by which infiltrator National Attack dwarfs target National Defense. Minimum: zero (0%).
+	- If a target is 10% transparent to the attacker that means the attacker can see the easiest 10% of the total hidden 10%.
+	- Hidden information, priority, and quantity calculation:
+		- What information is visible though the espionage system [category name: category components]?	
+			- Building-Locations: Which buildings exist in which provinces.
+			- Province-Level Info: province stability, province happiness, province security, province population, province wealth.
+			- Positions of Formations: In which provinces are non-reserve formations located.
+			- Target's COINTEL: Which provinces have Suppress Foreign Operation active.
+			- Target's Foreign Espionage: which nations are being targeted within the espionage system by the target.
+		- List of information by ease [easiest to hardest]: {Building-Locations, Province-Level Info, Positions of Formations, Target's COINTEL, Target's Foreign Espionage}
+		- How is "quantity of information" calculated for "easiest x %"?
+			-
+	- IMPORTANT NOTE: The player needs a toggle to make information on their own nation visible to others within the espionage system. This control needs to be granular at the foreign-nation level so that a player can allow a specific other player to view a certain category of hidden information.
+
+Actions:
+	- Foreign:
+		- Investigate Province: Massively boosts National Attack, but only when calculating transparency for the targeted province.
+		- Promote Foreign Ideology: Causes unhappy or unsecure populations be more unstable. Also generates base instability.
+		- Terrorist Attack: Kill a small number of pops and cause a massive temporary decrease to security.
+		- Sabotage Building: Take a specific building in a specific province offline for a time. Length of disablement determined by Transparency, with greater Transparency yielding a longer time.
+	- Domestic:
+		- Suppress Foreign Operations: boost Provincial Defense in one province.
+
+Existing Building Changes:
+	- REMOVE: Intelligence Agency
+
+Added Buildings:
+	- Attack Buildings [name: effects]:
+		- Foreign Intel Agency HQ: Creates the ability to infiltrate foreign nations (plus one additional simultaneous per level over base).
+		- Branch Office: Each province with a branch office specializes in a different Foreign Action at the time the first level is built. Each extra level allows that foreign action to be done one more simultaneous time.
+	- Defense Buildings [name: effects]:
+		- Domestic Intel Agency HQ: Boosts National Defense for each level. Allows one addition simultaneous Suppress Foreign Operations Action for each level.
+		- Local Office: Boosts Provincial Defense for each level.

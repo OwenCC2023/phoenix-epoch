@@ -1,0 +1,3 @@
+Happiness System:
+
+Main Goal: Describe quantitatively how happy the population is with the government given the population's ideology vs the government's implementation.

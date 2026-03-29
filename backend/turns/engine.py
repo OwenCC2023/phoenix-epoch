@@ -127,6 +127,8 @@ class TurnResolutionEngine:
                 nation.save(update_fields=[field])
                 apply_government_modifiers(nation)
                 self._log(f"{nation.name} changed gov_{component} to {new_value}")
+                # Sweep policies: force any newly-disabled ones to default
+                self._sweep_disabled_policies(nation, turn)
             elif payload["change_type"] == "policy_level":
                 category = payload["category"]
                 new_level = payload["new_level"]
@@ -145,6 +147,49 @@ class TurnResolutionEngine:
                 self._log(f"{nation.name} changed {category} to {level_name}")
             order.status = Order.Status.EXECUTED
             order.save(update_fields=["status"])
+
+    def _sweep_disabled_policies(self, nation, turn):
+        """
+        After a gov change, force any newly-disabled policies to default level.
+
+        Checks GOV_POLICY_DISABLES for each of the nation's current gov options.
+        If a NationPolicy row matches a disabled (category, level), reset it to
+        the category's default_level.
+        """
+        from nations.models import NationPolicy
+        from nations.policy_constants import POLICY_CATEGORIES
+        from nations.disabling_rules import GOV_POLICY_DISABLES
+
+        gov_values = [
+            nation.gov_direction,
+            nation.gov_economic_category,
+            nation.gov_structure,
+            nation.gov_power_origin,
+            nation.gov_power_type,
+        ]
+
+        # Collect all disabled (cat, level) pairs from current gov options
+        disabled_set = set()
+        for gov_val in gov_values:
+            for pair in GOV_POLICY_DISABLES.get(gov_val, []):
+                disabled_set.add(pair)
+
+        if not disabled_set:
+            return
+
+        # Check each policy row
+        for policy in NationPolicy.objects.filter(nation=nation):
+            if (policy.category, policy.level) in disabled_set:
+                cat_def = POLICY_CATEGORIES.get(policy.category, {})
+                default = cat_def.get("default_level", 0)
+                old_level = policy.level
+                policy.level = default
+                policy.changed_turn = turn.turn_number
+                policy.save(update_fields=["level", "changed_turn"])
+                self._log(
+                    f"{nation.name}: {policy.category} forced from "
+                    f"level {old_level} to default {default} (gov disabling)"
+                )
 
     def _execute_allocations(self, turn):
         """Execute sector allocation orders."""

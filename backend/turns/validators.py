@@ -142,6 +142,7 @@ def _validate_policy_change(order):
 
     if change_type == "government":
         from nations.government_constants import GOV_COMPONENTS
+        from nations.disabling_rules import TRAIT_GOV_DISABLES
         component = payload.get("component")
         new_value = payload.get("new_value")
         if component not in GOV_COMPONENTS:
@@ -153,6 +154,33 @@ def _validate_policy_change(order):
                 f"Invalid value '{new_value}' for component '{component}'. "
                 f"Choose from: {valid}"
             )
+        else:
+            # Check trait→gov disabling
+            from nations.models import Nation
+            try:
+                nation = Nation.objects.get(pk=order.nation_id)
+            except Nation.DoesNotExist:
+                errors.append("Nation not found")
+                return errors
+
+            ideology = nation.ideology_traits or {}
+            strong_trait = ideology.get("strong")
+            weak_traits = ideology.get("weak", [])
+
+            if strong_trait:
+                disabled = TRAIT_GOV_DISABLES.get((strong_trait, "strong"), [])
+                if new_value in disabled:
+                    errors.append(
+                        f"Government option '{new_value}' is disabled by "
+                        f"strong trait '{strong_trait}'"
+                    )
+            for wt in weak_traits:
+                disabled = TRAIT_GOV_DISABLES.get((wt, "weak"), [])
+                if new_value in disabled:
+                    errors.append(
+                        f"Government option '{new_value}' is disabled by "
+                        f"weak trait '{wt}'"
+                    )
     elif change_type == "policy_level":
         from nations.policy_constants import POLICY_CATEGORIES
         category = payload.get("category")

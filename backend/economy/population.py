@@ -198,9 +198,16 @@ def simulate_migration(provinces, province_growth_rates):
     province_growth_rates:
         Dict of province.id → float growth rate as computed by
         calculate_province_growth_rate this turn.
+
+    Returns
+    -------
+    dict[int, int]
+        Net immigration count per province.id (positive = arrivals).
+        Used by the security system to compute the immigration penalty.
     """
     sending = []    # list of (province, outflow_count)
     receiving = []  # list of (province, growth_rate_weight)
+    net_immigration = {}  # province.id → migrants_in
 
     for province in provinces:
         rate = province_growth_rates.get(province.id, 0.0)
@@ -214,7 +221,7 @@ def simulate_migration(provinces, province_growth_rates):
             receiving.append((province, rate))
 
     if not sending:
-        return  # nobody is declining enough to trigger starvation migration
+        return net_immigration  # nobody is declining enough to trigger starvation migration
 
     total_migrants = sum(count for _, count in sending)
 
@@ -226,7 +233,7 @@ def simulate_migration(provinces, province_growth_rates):
     if not receiving:
         # Nation-wide starvation: no internal destination.
         # Migrants have already been deducted — they leave the nation entirely.
-        return
+        return net_immigration
 
     # Internal migration: distribute to growing provinces weighted by growth rate.
     total_weight = sum(w for _, w in receiving)
@@ -240,6 +247,10 @@ def simulate_migration(provinces, province_growth_rates):
         province.population += migrants_in
         province.save(update_fields=["population"])
         distributed += migrants_in
+        if migrants_in > 0:
+            net_immigration[province.id] = net_immigration.get(province.id, 0) + migrants_in
+
+    return net_immigration
 
 
 def simulate_economic_migration(provinces, province_growth_rates, province_job_status):
@@ -275,7 +286,7 @@ def simulate_economic_migration(provinces, province_growth_rates, province_job_s
             destinations.append((province, status["unfilled_jobs"]))
 
     if not destinations:
-        return  # no economic pull anywhere
+        return {}  # no economic pull anywhere
 
     total_demand = sum(d for _, d in destinations)
 
@@ -292,7 +303,7 @@ def simulate_economic_migration(provinces, province_growth_rates, province_job_s
                 sending.append((province, actual))
 
     if not sending:
-        return
+        return {}
 
     total_supply = sum(m for _, m in sending)
     # Cap outflow so we never send more people than there are jobs to fill.
@@ -308,6 +319,7 @@ def simulate_economic_migration(provinces, province_growth_rates, province_job_s
             actual_sent += to_send
 
     # Distribute to destinations proportional to unfilled job count.
+    net_immigration = {}
     distributed = 0
     for i, (province, demand) in enumerate(destinations):
         if i == len(destinations) - 1:
@@ -317,4 +329,7 @@ def simulate_economic_migration(provinces, province_growth_rates, province_job_s
         if migrants_in > 0:
             province.population += migrants_in
             province.save(update_fields=["population"])
+            net_immigration[province.id] = net_immigration.get(province.id, 0) + migrants_in
         distributed += migrants_in
+
+    return net_immigration

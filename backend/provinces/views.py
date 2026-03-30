@@ -204,6 +204,16 @@ class BuildingView(APIView):
                 {"detail": "Naval War Colleges can only be built in coastal provinces."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if b_def.get("urban_only") and province.designation not in ("urban", "capital", "post_urban"):
+            return Response(
+                {"detail": f"{b_def['label']} can only be built in urban provinces."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if b_def.get("rural_only") and province.designation not in ("rural",):
+            return Response(
+                {"detail": f"{b_def['label']} can only be built in rural provinces."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Determine target level
         try:

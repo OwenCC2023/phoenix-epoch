@@ -65,6 +65,7 @@ PROVINCE_EFFECT_KEYS = [
     "stability_recovery_bonus",
     "construction_time_reduction",
     "literacy_bonus",
+    "security",                # flat security points contributed to province.local_security
     "march_speed_bonus",       # province-scope land travel speed (road_network, railway_station)
     "sea_transit_speed",       # province-scope sea embarkation speed (dock, port)
     "river_transit_speed",     # province-scope river crossing speed (dock, bridge)
@@ -184,6 +185,10 @@ BUILDING_SECTOR = {
     "administrative_center": "government",
     "police_headquarters":   "government",
     "intelligence_agency":   "government",
+    "police_station":        "government",
+    "sheriffs_office":       "government",
+    "fire_house":            "government",
+    "disaster_management":   "government",
     # ----- Government education -----
     "public_school":         "government",
     "university":            "government",
@@ -805,7 +810,7 @@ BUILDING_TYPES = {
         "base_outputs": {},
         "base_construction_cost": {"materials": 800, "wealth": 600},
         "base_construction_turns": 6,
-        "base_effects": {"research_bonus": 0.10, "stability_recovery_bonus": 0.08},
+        "base_effects": {"research_bonus": 0.10, "stability_recovery_bonus": 0.08, "security": 2},
     },
     "broadcasting_station": {
         "label": "Broadcasting Station",
@@ -1050,15 +1055,16 @@ BUILDING_TYPES = {
     # GOVERNMENT — SECURITY
     # ============================================================
     "police_headquarters": {
-        "label": "Police Headquarters",
+        "label": "Security Center",
         "category": "government_security",
-        "description": "Law enforcement centre that maintains public order and accelerates stability recovery.",
-        "base_workers": 150,
-        "base_inputs": {"wealth": 100, "arms": 30},
+        "description": "Major law enforcement hub providing significant public security and accelerating stability recovery. Urban provinces only.",
+        "urban_only": True,
+        "base_workers": 200,
+        "base_inputs": {"wealth": 150, "arms": 50},
         "base_outputs": {},
-        "base_construction_cost": {"materials": 700, "wealth": 500},
-        "base_construction_turns": 6,
-        "base_effects": {"stability_recovery_bonus": 0.15, "bureaucratic_capacity": 8},
+        "base_construction_cost": {"materials": 1200, "wealth": 900},
+        "base_construction_turns": 9,
+        "base_effects": {"security": 10, "stability_recovery_bonus": 0.15, "bureaucratic_capacity": 8},
     },
     "intelligence_agency": {
         "label": "Intelligence Agency",
@@ -1070,6 +1076,53 @@ BUILDING_TYPES = {
         "base_construction_cost": {"materials": 600, "wealth": 600},
         "base_construction_turns": 7,
         "base_effects": {"stability_recovery_bonus": 0.10, "integration_bonus": 0.03, "bureaucratic_capacity": 12},
+    },
+    "police_station": {
+        "label": "Police Station",
+        "category": "government_security",
+        "description": "Local policing post maintaining order in urban neighbourhoods. Urban provinces only.",
+        "urban_only": True,
+        "base_workers": 80,
+        "base_inputs": {"wealth": 60, "arms": 15},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 400, "wealth": 300},
+        "base_construction_turns": 4,
+        "base_effects": {"security": 4},
+    },
+    "sheriffs_office": {
+        "label": "Sheriff's Office",
+        "category": "government_security",
+        "description": "Rural law enforcement post providing security across dispersed countryside communities. Rural provinces only.",
+        "rural_only": True,
+        "base_workers": 60,
+        "base_inputs": {"wealth": 40},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 250, "wealth": 200},
+        "base_construction_turns": 3,
+        "base_effects": {"security": 5},
+    },
+    "fire_house": {
+        "label": "Fire House",
+        "category": "government_security",
+        "description": "Fire and emergency response station reducing disaster risk and improving community safety.",
+        "base_workers": 50,
+        "base_inputs": {"wealth": 30},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 200, "wealth": 150},
+        "base_construction_turns": 3,
+        "base_effects": {"security": 2},
+    },
+    "disaster_management": {
+        "label": "Disaster Management Facility",
+        "category": "government_security",
+        "description": "Centralised crisis coordination hub for urban areas, providing major security improvements. Urban provinces only.",
+        "urban_only": True,
+        "base_workers": 120,
+        "base_inputs": {"wealth": 80, "energy": 40},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 600, "wealth": 450},
+        "base_construction_turns": 5,
+        "base_effects": {"security": 8},
     },
 
     # ============================================================

@@ -25,6 +25,7 @@ from .disabling_rules import (
     POLICY_POLICY_DISABLES,
 )
 from .policy_building_forbidden import POLICY_BUILDING_FORBIDDEN
+from .security_policy_data import SECURITY_POLICY_MULTIPLIERS
 
 
 def get_nation_policy_effects(nation):
@@ -353,6 +354,23 @@ def get_policy_building_blocks(nation):
                 break
 
     return blocked
+
+
+def get_security_policy_multiplier(nation):
+    """
+    Return the aggregate security multiplier from all of a nation's active policies.
+
+    Iterates NationPolicy rows, looks up each (category, level) in
+    SECURITY_POLICY_MULTIPLIERS, and returns the product of all matching values.
+    Missing entries default to 1.0.
+    """
+    from .models import NationPolicy
+
+    combined = 1.0
+    for policy in NationPolicy.objects.filter(nation=nation):
+        level_mult = SECURITY_POLICY_MULTIPLIERS.get(policy.category, {}).get(policy.level, 1.0)
+        combined *= level_mult
+    return combined
 
 
 def get_policy_unit_blocks(nation):

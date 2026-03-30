@@ -24,6 +24,11 @@ from .population import (
     simulate_migration,
     simulate_economic_migration,
 )
+from .security import (
+    compute_province_security,
+    get_security_stability_multiplier,
+    get_security_growth_bonus,
+)
 
 
 RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
@@ -117,6 +122,17 @@ def simulate_nation_economy(nation, turn_number):
     # Apply trait + policy bonuses to national modifiers.
     # Both old-style keys (integration_bonus, research_bonus) and new-style
     # keys (integration_pct, research_pct) are checked and summed.
+    # Security system: pre-compute nation-level multipliers once per turn.
+    from nations.policy_effects import get_security_policy_multiplier
+    security_policy_mult = get_security_policy_multiplier(nation)
+    security_trait_mult = trait_effects.get("security_multiplier", 1.0)
+    ideology_traits = nation.ideology_traits or {}
+    all_trait_keys = set()
+    if ideology_traits.get("strong"):
+        all_trait_keys.add(ideology_traits["strong"])
+    all_trait_keys.update(ideology_traits.get("weak", []))
+    has_internationalist = "internationalist" in all_trait_keys
+
     integration_bonus_from_traits = (
         trait_effects.get("integration_bonus", 0.0)
         + trait_effects.get("integration_pct", 0.0)
@@ -286,10 +302,27 @@ def simulate_nation_economy(nation, turn_number):
         #   Uses previous turn's pool.food so non-food provinces aren't
         #   perpetually penalised when the nation has a healthy stockpile.
         #   stability_recovery_bonus from buildings adds to recovery rate.
+        #   Security multiplies the effective recovery (high security = faster recovery).
         # ----------------------------------------------------------------
-        effective_recovery = STABILITY_RECOVERY_RATE + bldg_effects.get("stability_recovery_bonus", 0.0)
         national_food_share = (pool.food / max(total_pop, 1)) * province.population
         effective_food = raw_production["food"] + national_food_share
+        food_ratio = effective_food / max(local_food_consumption, 0.001)
+
+        # Step 6a: Province security (computed fresh each turn)
+        province.local_security = compute_province_security(
+            bldg_effects=bldg_effects,
+            policy_security_mult=security_policy_mult,
+            trait_security_mult=security_trait_mult,
+            food_ratio=food_ratio,
+            net_immigration_pct=0.0,  # immigration penalty wired in Step 13b-c
+            has_internationalist=has_internationalist,
+        )
+
+        security_stability_mult = get_security_stability_multiplier(province.local_security)
+        effective_recovery = (
+            (STABILITY_RECOVERY_RATE + bldg_effects.get("stability_recovery_bonus", 0.0))
+            * security_stability_mult
+        )
         if effective_food < local_food_consumption:
             province.local_stability = max(0, province.local_stability - STABILITY_FOOD_DEFICIT_PENALTY)
         else:
@@ -308,7 +341,7 @@ def simulate_nation_economy(nation, turn_number):
         resources_obj.save()
 
         province.designation = designation
-        province.save(update_fields=["local_stability", "designation"])
+        province.save(update_fields=["local_stability", "local_security", "designation"])
 
         ProvinceLedger.objects.create(
             province=province,
@@ -381,8 +414,11 @@ def simulate_nation_economy(nation, turn_number):
         food_produced, food_needed = province_food[province.id]
         # Merge building growth_bonus and trait growth into modifiers for this province.
         bldg_growth = province_job_status.get(province.id, {}).get("growth_bonus", 0.0)
+        security_growth = get_security_growth_bonus(province.local_security)
         province_modifiers = dict(national_modifiers)
-        province_modifiers["growth"] = national_modifiers.get("growth", 0.0) + bldg_growth + growth_bonus_from_traits
+        province_modifiers["growth"] = (
+            national_modifiers.get("growth", 0.0) + bldg_growth + growth_bonus_from_traits + security_growth
+        )
 
         # Trait: urban growth penalty (ecologist)
         prov_designation = getattr(province, "designation", "rural")
@@ -404,11 +440,36 @@ def simulate_nation_economy(nation, turn_number):
 
     # Step 13b: Starvation migration — people flee declining provinces.
     # Nation-wide decline → external emigration (national total decreases).
-    simulate_migration(provinces, province_growth_rates)
+    starvation_immigration = simulate_migration(provinces, province_growth_rates)
 
     # Step 13c: Economic migration — subsistence workers move toward unfilled jobs.
     # Always internal; national total is conserved.
-    simulate_economic_migration(provinces, province_growth_rates, province_job_status)
+    economic_immigration = simulate_economic_migration(provinces, province_growth_rates, province_job_status)
+
+    # Step 13d: Apply immigration security penalty.
+    # Provinces that received migrants this turn get a security hit unless the
+    # nation has the Internationalist trait (strong or weak).
+    if not has_internationalist:
+        combined_immigration = dict(starvation_immigration)
+        for pid, count in economic_immigration.items():
+            combined_immigration[pid] = combined_immigration.get(pid, 0) + count
+        provinces_by_id = {p.id: p for p in provinces}
+        for province_id, migrants_in in combined_immigration.items():
+            province = provinces_by_id.get(province_id)
+            if province is None or province.population <= 0:
+                continue
+            immigration_pct = migrants_in / province.population
+            if immigration_pct > 0.0:
+                from economy.security_constants import (
+                    SECURITY_IMMIGRATION_PENALTY_RATE,
+                    SECURITY_IMMIGRATION_PENALTY_CAP,
+                )
+                penalty = max(
+                    SECURITY_IMMIGRATION_PENALTY_CAP,
+                    immigration_pct * 100.0 * SECURITY_IMMIGRATION_PENALTY_RATE,
+                )
+                province.local_security = max(0.0, min(100.0, province.local_security + penalty))
+                province.save(update_fields=["local_security"])
 
     # Recalculate after all migration (starvation migration may reduce national total)
     total_pop_after = sum(p.population for p in provinces)

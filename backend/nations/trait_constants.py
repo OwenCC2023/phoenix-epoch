@@ -225,7 +225,7 @@ TRAIT_DEFS = {
     # --- Pair 4: Devious / Honorable ---
     "devious": {
         "name": "Devious",
-        "description": "The ends justify the means. Better espionage but worse diplomatic reputation.",
+        "description": "The ends justify the means. Better espionage but worse diplomatic reputation and reduced security.",
         "pair_index": 4,
         "strong_effects": {
             "trade_pct": 0.03,
@@ -233,28 +233,32 @@ TRAIT_DEFS = {
             "counter_espionage_bonus": 0.10,
             "diplomatic_reputation_penalty": -0.15,
             "corruption_resistance": -0.05,
+            "security_multiplier": 0.8,
         },
         "weak_effects": {
             "espionage_bonus": 0.12,
             "counter_espionage_bonus": 0.05,
             "diplomatic_reputation_penalty": -0.08,
             "corruption_resistance": -0.02,
+            "security_multiplier": 0.9,
         },
     },
     "honorable": {
         "name": "Honorable",
-        "description": "Deals are sacred. Better diplomatic reputation but vulnerable to espionage.",
+        "description": "Deals are sacred. Better diplomatic reputation and greatly improved security, but vulnerable to espionage.",
         "pair_index": 4,
         "strong_effects": {
             "stability_bonus": 2.0,
             "trade_pct": -0.02,
             "diplomatic_reputation_bonus": 0.15,
             "corruption_resistance": 0.04,
+            "security_multiplier": 1.8,
         },
         "weak_effects": {
             "stability_bonus": 1.0,
             "diplomatic_reputation_bonus": 0.08,
             "corruption_resistance": 0.02,
+            "security_multiplier": 1.4,
         },
     },
 
@@ -548,6 +552,10 @@ def get_effective_trait_effects(ideology_traits):
     return merged
 
 
+# Keys whose values should be multiplied rather than summed when merging.
+_MULTIPLICATIVE_EFFECT_KEYS = {"security_multiplier"}
+
+
 def _merge_effects(target, source):
     """Merge source effects into target, handling different value types."""
     for key, value in source.items():
@@ -559,6 +567,9 @@ def _merge_effects(target, source):
                 target[key] = list(value)
             else:
                 target[key] = value
+        elif key in _MULTIPLICATIVE_EFFECT_KEYS and isinstance(value, (int, float)):
+            # Multiplicative keys: multiply together rather than add
+            target[key] = target[key] * value
         elif isinstance(value, (int, float)) and isinstance(target[key], (int, float)):
             target[key] += value
         elif isinstance(value, dict) and isinstance(target[key], dict):

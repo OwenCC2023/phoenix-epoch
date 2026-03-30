@@ -101,8 +101,8 @@ Each building level can declare an `effects` dict. Effect keys split into two sc
 - `integration_bonus` — additional fraction of province surplus reaching national pool
 - `growth_bonus` — flat monthly addition to population growth rate
 - `stability_recovery_bonus` — addition to monthly stability recovery rate
-- `construction_time_reduction` — fraction reduction in construction turns *(stub — not yet wired into build API)*
-- `literacy_bonus` — multiplier for province literacy rate *(stub — not yet wired)*
+- `construction_time_reduction` — fraction reduction in construction turns
+- `literacy_bonus` — multiplier for province literacy rate
 - `march_speed_bonus` — province-scope land travel speed modifier (road_network, railway_station)
 - `sea_transit_speed` — province-scope sea embarkation speed modifier (dock, port)
 - `river_transit_speed` — province-scope river crossing speed modifier (dock, bridge)
@@ -110,8 +110,8 @@ Each building level can declare an `effects` dict. Effect keys split into two sc
 
 **National scope** (summed across all provinces, applied nationally each turn):
 - `upkeep_reduction` — fraction reduction in government upkeep
-- `construction_cost_reduction` — fraction reduction in construction costs *(stub — not yet wired into build API)*
-- `bureaucratic_capacity` — total bureaucratic capacity (use-it-or-lose-it, stub)
+- `construction_cost_reduction` — fraction reduction in construction costs
+- `bureaucratic_capacity` — total bureaucratic capacity (use-it-or-lose-it)
 - `land_trade_capacity` — total land trade capacity from financial + ground transport buildings
 - `naval_trade_capacity` — total naval trade capacity from port/dock buildings
 - `air_trade_capacity` — total air trade capacity from airport/air_cargo_terminal buildings
@@ -119,15 +119,15 @@ Each building level can declare an `effects` dict. Effect keys split into two sc
 - `sea_transit_speed` — national sea-to-sea travel speed modifier (also naval_war_college)
 - `river_transit_speed` — national river-to-river travel speed modifier
 - `air_transit_speed` — national air-to-air travel speed modifier (also air_force_academy)
-- `army_training_speed_bonus` — reduces army unit training turns *(stub — wired when military sim built)*
-- `navy_training_speed_bonus` — reduces navy unit training turns *(stub)*
-- `air_training_speed_bonus` — reduces air unit training turns *(stub)*
-- `army_combat_bonus` — army combat effectiveness multiplier *(stub — wired when combat built)*
-- `navy_combat_bonus` — navy combat effectiveness multiplier *(stub)*
-- `air_combat_bonus` — air combat effectiveness multiplier *(stub)*
-- `army_upkeep_reduction` — fraction reduction in army unit upkeep *(stub)*
-- `navy_upkeep_reduction` — fraction reduction in navy unit upkeep *(stub)*
-- `air_upkeep_reduction` — fraction reduction in air unit upkeep *(stub)*
+- `army_training_speed_bonus` — reduces army unit training turns
+- `navy_training_speed_bonus` — reduces navy unit training turns
+- `air_training_speed_bonus` — reduces air unit training turns
+- `army_combat_bonus` — army combat effectiveness multiplier
+- `navy_combat_bonus` — navy combat effectiveness multiplier
+- `air_combat_bonus` — air combat effectiveness multiplier
+- `army_upkeep_reduction` — fraction reduction in army unit upkeep
+- `navy_upkeep_reduction` — fraction reduction in navy unit upkeep
+- `air_upkeep_reduction` — fraction reduction in air unit upkeep
 
 **Note on dual-scope keys:** `march_speed_bonus`, `sea_transit_speed`, `river_transit_speed`, and `air_transit_speed` appear in **both** `PROVINCE_EFFECT_KEYS` and `NATIONAL_EFFECT_KEYS`. Province-scope values apply only to that province's cross-type transitions; national-scope values apply globally to same-type zone travel.
 
@@ -147,18 +147,6 @@ Helper functions: `get_province_building_effects(province)` and `get_national_bu
 | 5 | **Industry cluster** | `INDUSTRY_CLUSTER_BONUS = 0.05` | Per-building: +5% per other active same-category building in province |
 
 **Key function:** `compute_building_efficiency()` in `economy/building_simulation.py`.
-
-**Government building_efficiency bonuses:**
-
-| Government | Bonus 1 | Bonus 2 | Bonus 3 |
-|-----------|---------|---------|---------|
-| democracy | financial +10% | communications +8% | |
-| autocracy | heavy_manufacturing +10% | extraction +8% | |
-| theocracy | farming +8% | healthcare +10% | religious +12% |
-| junta | construction +10% | heavy_manufacturing +8% | |
-| tribal | farming +12% | extraction +8% | |
-| corporate | financial +12% | transport +8% | |
-| commune | farming +10% | light_manufacturing +8% | |
 
 **Trait building_efficiency bonuses:** Several traits provide `building_efficiency_bonus` dicts in their effects. These are merged from the nation's 3 selected traits (1 strong + 2 weak, each with different magnitudes). See `nations/trait_constants.py` for the full definitions. Example traits with efficiency bonuses: militarist (heavy_manufacturing, chemical), positivist (communications, pharmaceutical), ecologist (farming, extraction, green_energy), industrialist (heavy_manufacturing, refining), spiritualist (religious, healthcare), etc.
 
@@ -479,6 +467,31 @@ No combat system yet. Provinces can be reassigned via admin, but there is no pla
 ### Construction cost/time reduction (wiring stub)
 `construction_cost_reduction` (national) and `construction_time_reduction` (province) effects are computed by buildings but not yet applied in the build API. `get_construction_modifiers(nation)` in `building_simulation.py` aggregates cost reduction and is ready to call from the construction view.
 
+### Stub effect keys (declared but not wired)
+
+**Building/province scope:**
+- `literacy_bonus` — multiplier for province literacy rate
+- `construction_time_reduction` — fraction reduction in construction turns (computed by `get_construction_modifiers()` but not applied in build API)
+
+**National scope:**
+- `construction_cost_reduction` — computed by `get_construction_modifiers()` but not applied in build API
+- `bureaucratic_capacity` — use-it-or-lose-it capacity system (declared in `NATIONAL_EFFECT_KEYS`)
+- `army_training_speed_bonus`, `navy_training_speed_bonus`, `air_training_speed_bonus` — wired in skeleton when military simulation built
+- `army_combat_bonus`, `navy_combat_bonus`, `air_combat_bonus` — wired when combat system built
+- `army_upkeep_reduction`, `navy_upkeep_reduction`, `air_upkeep_reduction` — wired when military upkeep system built
+
+**Trait scope:**
+- `urban_output_bonus` — building output multiplier in urban provinces (stub — not yet wired in `building_simulation.py`)
+- `trade_capacity` — diplomatic/internal trade bonuses
+- `diplomatic_reputation` — reputation modifiers
+- `espionage` — espionage effectiveness
+- `happiness` — population happiness/satisfaction
+- `literacy` — general literacy bonus
+- `military_organisation` — military structural efficiency
+
+**Policy/Unit gates:**
+- `UNIT_POLICY_REQUIREMENTS` / `UNIT_POLICY_BANS` — unit type blocking by policy (gate stubs, awaiting military unit system)
+
 ---
 
 ## Balance spreadsheet — effects_matrix.xlsx
@@ -530,30 +543,6 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe ../t
 ```
 
 `tools/export_policy_effects.py` reads `POLICY_CATEGORIES` and `POLICY_EFFECTS` from `nations/policy_constants.py` and rewrites only the Policy Effects sheet, leaving the other sheets untouched.
-
-After regenerating, run the numbers-stored-as-text cleanup pass if any new string values were introduced:
-
-```python
-# one-liner cleanup (run from backend/ with Django setup)
-import re, openpyxl
-wb = openpyxl.load_workbook('../effects_matrix.xlsx')
-pct_re = re.compile(r'^([+-]?\d+\.?\d*)%$')
-flat_re = re.compile(r'^([+-]?\d+\.?\d*)$')
-for ws in wb.worksheets:
-    for row in ws.iter_rows():
-        for cell in row:
-            if not isinstance(cell.value, str): continue
-            m = pct_re.match(cell.value.strip())
-            if m:
-                cell.value = float(m.group(1)) / 100
-                cell.number_format = '+0.0%;-0.0%;0.0%'; continue
-            m = flat_re.match(cell.value.strip())
-            if m:
-                v = float(m.group(1))
-                cell.value = v
-                cell.number_format = '+0.0;-0.0;0.0' if '.' in m.group(1) else '+#,##0;-#,##0;0'
-wb.save('../effects_matrix.xlsx')
-```
 
 ### Implementing balance changes from a new spreadsheet version
 

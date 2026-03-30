@@ -29,6 +29,11 @@ from .security import (
     get_security_stability_multiplier,
     get_security_growth_bonus,
 )
+from .happiness import (
+    compute_province_happiness,
+    get_happiness_growth_multiplier,
+    get_happiness_stability_recovery_multiplier,
+)
 
 
 RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
@@ -209,6 +214,10 @@ def simulate_nation_economy(nation, turn_number):
     national_bldg_effects = get_national_building_effects(provinces)
     upkeep_reduction = min(0.75, national_bldg_effects.get("upkeep_reduction", 0.0))
 
+    # Pre-compute active policies dict for happiness calculation (same for all provinces)
+    from nations.models import NationPolicy
+    active_policies = {p.category: p.current_level for p in NationPolicy.objects.filter(nation=nation)}
+
     for province in provinces:
         # ----------------------------------------------------------------
         # Step 1: Determine employment split via job system
@@ -319,17 +328,29 @@ def simulate_nation_economy(nation, turn_number):
         )
 
         security_stability_mult = get_security_stability_multiplier(province.local_security)
+
+        # Step 6b: Province happiness (static recompute, same as security)
+        province.local_happiness = compute_province_happiness(
+            province=province,
+            nation=nation,
+            trait_effects=trait_effects,
+            active_policies=active_policies,
+        )
+        happiness_recovery_mult = get_happiness_stability_recovery_multiplier(province.local_happiness)
+
         effective_recovery = (
             (STABILITY_RECOVERY_RATE + bldg_effects.get("stability_recovery_bonus", 0.0))
             * security_stability_mult
+            * happiness_recovery_mult
         )
         if effective_food < local_food_consumption:
             province.local_stability = max(0, province.local_stability - STABILITY_FOOD_DEFICIT_PENALTY)
         else:
             province.local_stability = min(100, province.local_stability + effective_recovery)
 
-        # Store growth_bonus for use in Step 13
+        # Store growth_bonus and happiness for use in Step 13
         province_job_status[province.id]["growth_bonus"] = bldg_effects.get("growth_bonus", 0.0)
+        province_job_status[province.id]["local_happiness"] = province.local_happiness
 
         # ----------------------------------------------------------------
         # Step 7: Persist province state
@@ -341,7 +362,7 @@ def simulate_nation_economy(nation, turn_number):
         resources_obj.save()
 
         province.designation = designation
-        province.save(update_fields=["local_stability", "local_security", "designation"])
+        province.save(update_fields=["local_stability", "local_security", "local_happiness", "designation"])
 
         ProvinceLedger.objects.create(
             province=province,
@@ -433,6 +454,8 @@ def simulate_nation_economy(nation, turn_number):
             national_stability=final_pools["stability"],
             modifiers=province_modifiers,
         )
+        prov_happiness = province_job_status.get(province.id, {}).get("local_happiness", 50.0)
+        growth_rate *= get_happiness_growth_multiplier(prov_happiness)
         province_growth_rates[province.id] = growth_rate
         province.population = max(100, int(province.population * (1 + growth_rate)))
         province.save(update_fields=["population"])
@@ -484,6 +507,9 @@ def simulate_nation_economy(nation, turn_number):
     for key in RESOURCE_KEYS:
         setattr(pool, key, final_pools[key])
     pool.stability = final_pools.get("stability", 50)
+    pool.happiness = round(
+        sum(p.local_happiness for p in provinces) / len(provinces), 2
+    ) if provinces else 50.0
     pool.total_population = total_pop_after
     pool.save()
 

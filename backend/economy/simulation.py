@@ -114,10 +114,14 @@ def simulate_nation_economy(nation, turn_number):
     from nations.policy_effects import get_nation_policy_effects
     policy_effects = get_nation_policy_effects(nation)
 
-    # Apply trait + policy bonuses to national modifiers
+    # Apply trait + policy bonuses to national modifiers.
+    # Both old-style keys (integration_bonus, research_bonus) and new-style
+    # keys (integration_pct, research_pct) are checked and summed.
     integration_bonus_from_traits = (
         trait_effects.get("integration_bonus", 0.0)
+        + trait_effects.get("integration_pct", 0.0)
         + policy_effects.get("integration_bonus", 0.0)
+        + policy_effects.get("integration_pct", 0.0)
     )
     stability_bonus_from_traits = (
         trait_effects.get("stability_bonus", 0.0) + trait_effects.get("stability_penalty", 0.0)
@@ -125,11 +129,15 @@ def simulate_nation_economy(nation, turn_number):
     )
     growth_bonus_from_traits = (
         trait_effects.get("growth_bonus", 0.0) + trait_effects.get("growth_penalty", 0.0)
+        + trait_effects.get("growth_rate", 0.0)
         + policy_effects.get("growth_bonus", 0.0) + policy_effects.get("growth_penalty", 0.0)
+        + policy_effects.get("growth_rate", 0.0)
     )
     research_mod_from_traits = (
         trait_effects.get("research_bonus", 0.0) + trait_effects.get("research_penalty", 0.0)
+        + trait_effects.get("research_pct", 0.0)
         + policy_effects.get("research_bonus", 0.0) + policy_effects.get("research_penalty", 0.0)
+        + policy_effects.get("research_pct", 0.0)
     )
     manpower_mod_from_traits = (
         trait_effects.get("manpower_bonus", 0.0)
@@ -137,15 +145,33 @@ def simulate_nation_economy(nation, turn_number):
     )
     wealth_mod_from_traits = (
         trait_effects.get("wealth_production_bonus", 0.0)
+        + trait_effects.get("production_wealth_pct", 0.0)
         + policy_effects.get("wealth_production_bonus", 0.0)
+        + policy_effects.get("production_wealth_pct", 0.0)
     )
     food_mod_from_traits = (
         trait_effects.get("food_production_bonus", 0.0)
+        + trait_effects.get("production_food_pct", 0.0)
         + policy_effects.get("food_production_bonus", 0.0)
+        + policy_effects.get("production_food_pct", 0.0)
     )
     upkeep_reduction_from_traits = (
         trait_effects.get("upkeep_reduction", 0.0)
         + policy_effects.get("upkeep_reduction", 0.0)
+    )
+
+    # New effect columns — tracked for downstream use
+    worker_productivity = (
+        trait_effects.get("worker_productivity", 0.0)
+        + policy_effects.get("worker_productivity", 0.0)
+    )
+    corruption_resistance = (
+        trait_effects.get("corruption_resistance", 0.0)
+        + policy_effects.get("corruption_resistance", 0.0)
+    )
+    environmental_health = (
+        trait_effects.get("environmental_health", 0.0)
+        + policy_effects.get("environmental_health", 0.0)
     )
 
     integration_modifier = BASE_INTEGRATION_EFFICIENCY + national_modifiers.get("integration", 0) + integration_bonus_from_traits
@@ -421,6 +447,7 @@ def simulate_nation_economy(nation, turn_number):
         nation, provinces, province_job_status, bldg_eff_mods,
         rationing_level=rationing_level,
         unit_needs=unit_upkeep_needs,
+        worker_productivity=worker_productivity,
     )
 
     # Step 16: Consumer goods consumption (shortage → stability penalty)

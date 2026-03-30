@@ -421,7 +421,7 @@ def compute_rationing_capacities(
 
 def simulate_building_production(
     nation, provinces, province_job_status, building_efficiency_modifiers,
-    rationing_level=0, unit_needs=None,
+    rationing_level=0, unit_needs=None, worker_productivity=0.0,
 ):
     """
     Process manufactured-goods production for all buildings in a nation.
@@ -564,8 +564,9 @@ def simulate_building_production(
                 setattr(good_stock, good, max(0.0, getattr(good_stock, good, 0.0) - deduct))
                 stock_dirty = True
 
+        productivity_mult = 1.0 + worker_productivity
         for good, amount in level_data["output_goods"].items():
-            produce = round(amount * effective_capacity * designation_mult * efficiency_mult, 4)
+            produce = round(amount * effective_capacity * designation_mult * efficiency_mult * productivity_mult, 4)
             if good in _POOL_RESOURCE_KEYS:
                 setattr(pool, good, round(getattr(pool, good, 0.0) + produce, 4))
                 pool_dirty = True

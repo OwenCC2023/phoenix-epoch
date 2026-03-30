@@ -3,7 +3,8 @@ Policy effects helper module.
 
 Provides functions to:
   - Merge all active policy effects for a nation (context-dependent on government/traits)
-  - Validate policy changes against requirements and cross-policy bans
+  - Apply gov-policy multiplier (24×277 matrix)
+  - Validate policy changes against requirements, cross-policy bans, and disabling cascade
   - Determine which buildings and units are blocked by current policies
 """
 
@@ -17,17 +18,26 @@ from .policy_constants import (
     UNIT_POLICY_REQUIREMENTS,
     UNIT_POLICY_BANS,
 )
+from .gov_policy_multipliers import GOV_POLICY_MULTIPLIERS
+from .disabling_rules import (
+    TRAIT_POLICY_DISABLES,
+    GOV_POLICY_DISABLES,
+    POLICY_POLICY_DISABLES,
+)
+from .policy_building_forbidden import POLICY_BUILDING_FORBIDDEN
 
 
 def get_nation_policy_effects(nation):
     """
     Iterate NationPolicy rows, look up POLICY_EFFECTS, apply government/trait
-    modifiers, and merge all effects additively.
+    modifiers, compute the gov-policy multiplier, and merge all effects additively.
 
-    Returns a flat dict of effect_key -> value.  ``building_efficiency_bonus``
+    Returns a flat dict of effect_key -> value.  ``building_efficiency``
     values are dicts (category -> bonus) and are merged by category key.
 
-    Same merge pattern as ``get_nation_trait_effects()`` in ``nations/helpers.py``.
+    Gov-policy multiplier: each of the nation's 5 gov components may scale
+    a policy's effects. The combined multiplier is the product of all 5
+    component multipliers, clamped to [0.1, 5.0].
     """
     from .models import NationPolicy
 
@@ -38,6 +48,13 @@ def get_nation_policy_effects(nation):
         nation.gov_power_origin,
         nation.gov_power_type,
     }
+    gov_components = [
+        nation.gov_direction,
+        nation.gov_economic_category,
+        nation.gov_structure,
+        nation.gov_power_origin,
+        nation.gov_power_type,
+    ]
 
     # Collect the nation's trait keys (strong + weak)
     traits = nation.ideology_traits or {}
@@ -62,33 +79,71 @@ def get_nation_policy_effects(nation):
         if not level_effects:
             continue
 
-        # Layer 1: base effects
-        _merge_into(merged, level_effects.get("base", {}))
+        # Compute combined gov-policy multiplier for this (category, level)
+        multiplier = _compute_gov_policy_multiplier(gov_components, cat, level)
+
+        # Layer 1: base effects (scaled by multiplier)
+        base = level_effects.get("base", {})
+        if base:
+            _merge_into(merged, _scale_effects(base, multiplier))
 
         # Layer 2: government modifiers — applies all matching axis values
         gov_mods = level_effects.get("government_modifiers", {})
         for axis_val, mods in gov_mods.items():
             if axis_val in gov_values:
-                _merge_into(merged, mods)
+                _merge_into(merged, _scale_effects(mods, multiplier))
 
         # Layer 3: trait modifiers (all matching traits)
         trait_mods = level_effects.get("trait_modifiers", {})
         for trait_key in nation_traits:
             if trait_key in trait_mods:
-                _merge_into(merged, trait_mods[trait_key])
+                _merge_into(merged, _scale_effects(trait_mods[trait_key], multiplier))
 
     return merged
+
+
+def _compute_gov_policy_multiplier(gov_components, category, level):
+    """
+    Compute the combined gov-policy multiplier for a (category, level) pair.
+
+    Each of the 5 gov components may have an entry in GOV_POLICY_MULTIPLIERS.
+    Missing entries default to 1.0.  The combined multiplier is the product
+    of all 5, clamped to [0.1, 5.0].
+    """
+    combined = 1.0
+    key = (category, level)
+    for comp in gov_components:
+        comp_mults = GOV_POLICY_MULTIPLIERS.get(comp)
+        if comp_mults:
+            combined *= comp_mults.get(key, 1.0)
+    return max(0.1, min(5.0, combined))
+
+
+def _scale_effects(effects, multiplier):
+    """Return a new dict with all effect values scaled by multiplier."""
+    if multiplier == 1.0:
+        return effects
+    scaled = {}
+    for key, value in effects.items():
+        if isinstance(value, dict):
+            scaled[key] = {k: v * multiplier for k, v in value.items()}
+        else:
+            scaled[key] = value * multiplier
+    return scaled
+
+
+_NESTED_DICT_KEYS = {"building_efficiency_bonus", "building_efficiency"}
 
 
 def _merge_into(target, source):
     """
     Merge source effects into target additively.
 
-    Handles ``building_efficiency_bonus`` as a nested dict of category -> bonus.
-    All other keys are treated as numeric and summed.
+    Handles ``building_efficiency_bonus`` and ``building_efficiency`` as nested
+    dicts of category -> bonus.  All other keys are treated as numeric and summed.
     """
     for key, value in source.items():
-        if key == "building_efficiency_bonus":
+        if key in _NESTED_DICT_KEYS:
             if key not in target:
                 target[key] = {}
             for cat, bonus in value.items():
@@ -99,14 +154,14 @@ def _merge_into(target, source):
 
 def validate_policy_change(nation, category, new_level):
     """
-    Check POLICY_REQUIREMENTS and POLICY_BANS for a proposed policy change.
+    Check all disabling sources for a proposed policy change.
 
-    POLICY_REQUIREMENTS keys:
-      ``gov_axis_required``   — nation must have at least one of these axis values
-      ``gov_axis_banned``     — nation must not have any of these axis values
-      ``traits_required``     — nation must have at least one of these traits
-      ``traits_banned``       — nation must not have any of these traits
-      ``policies_required``   — list of (category, min_level) tuples
+    Sources checked (in order):
+      1. TRAIT_POLICY_DISABLES — trait-based disabling
+      2. GOV_POLICY_DISABLES — government option disabling
+      3. POLICY_POLICY_DISABLES — cross-policy disabling
+      4. POLICY_REQUIREMENTS — prerequisite requirements (legacy, currently empty)
+      5. POLICY_BANS — cross-policy bans (legacy, currently empty)
 
     Returns a list of error strings.  Empty list means the change is valid.
     """
@@ -121,19 +176,59 @@ def validate_policy_change(nation, category, new_level):
         nation.gov_power_type,
     }
 
-    # Collect nation's trait keys
-    traits = nation.ideology_traits or {}
-    nation_traits = set()
-    strong = traits.get("strong")
-    if strong:
-        nation_traits.add(strong)
-    for w in traits.get("weak", []):
-        nation_traits.add(w)
+    # Collect nation's trait keys with their strength
+    ideology = nation.ideology_traits or {}
+    strong_trait = ideology.get("strong")
+    weak_traits = ideology.get("weak", [])
 
-    # Check requirements for the target level
+    # 1. Check trait-policy disabling
+    target = (category, new_level)
+    # Check strong trait
+    if strong_trait:
+        disabled = TRAIT_POLICY_DISABLES.get((strong_trait, "strong"), [])
+        if target in disabled:
+            errors.append(
+                f"Policy {category} level {new_level} is disabled by "
+                f"strong trait '{strong_trait}'"
+            )
+    # Check weak traits
+    for wt in weak_traits:
+        disabled = TRAIT_POLICY_DISABLES.get((wt, "weak"), [])
+        if target in disabled:
+            errors.append(
+                f"Policy {category} level {new_level} is disabled by "
+                f"weak trait '{wt}'"
+            )
+
+    # 2. Check gov-policy disabling
+    for gov_val in gov_values:
+        disabled = GOV_POLICY_DISABLES.get(gov_val, [])
+        if target in disabled:
+            errors.append(
+                f"Policy {category} level {new_level} is disabled by "
+                f"government option '{gov_val}'"
+            )
+
+    # 3. Check policy-policy disabling
+    current_policies = dict(
+        NationPolicy.objects.filter(nation=nation)
+        .exclude(category=category)
+        .values_list("category", "level")
+    )
+
+    for target_cat, target_level, when_cat, when_level in POLICY_POLICY_DISABLES:
+        if target_cat == category and target_level == new_level:
+            current = current_policies.get(when_cat)
+            if current is not None and current == when_level:
+                when_name = _get_level_name(when_cat, when_level)
+                errors.append(
+                    f"Policy {category} level {new_level} is disabled when "
+                    f"{when_cat} is at '{when_name}'"
+                )
+
+    # 4. Check legacy POLICY_REQUIREMENTS
     req = POLICY_REQUIREMENTS.get((category, new_level))
     if req:
-        # Government axis checks
         required = req.get("gov_axis_required")
         if required and not gov_values.intersection(required):
             errors.append(
@@ -149,14 +244,18 @@ def validate_policy_change(nation, category, new_level):
                 f"government axis values: {', '.join(bad)}"
             )
 
-        # Trait checks
+        nation_traits = set()
+        if strong_trait:
+            nation_traits.add(strong_trait)
+        for w in weak_traits:
+            nation_traits.add(w)
+
         traits_required = req.get("traits_required")
-        if traits_required:
-            if not nation_traits.intersection(traits_required):
-                errors.append(
-                    f"Policy {category} level {new_level} requires one of "
-                    f"traits: {', '.join(traits_required)}"
-                )
+        if traits_required and not nation_traits.intersection(traits_required):
+            errors.append(
+                f"Policy {category} level {new_level} requires one of "
+                f"traits: {', '.join(traits_required)}"
+            )
 
         traits_banned = req.get("traits_banned")
         if traits_banned:
@@ -167,13 +266,8 @@ def validate_policy_change(nation, category, new_level):
                     f"traits: {', '.join(bad)}"
                 )
 
-        # Prerequisite policies
         policies_required = req.get("policies_required")
         if policies_required:
-            current_policies = dict(
-                NationPolicy.objects.filter(nation=nation)
-                .values_list("category", "level")
-            )
             for req_cat, min_level in policies_required:
                 current = current_policies.get(req_cat, 0)
                 if current < min_level:
@@ -182,60 +276,50 @@ def validate_policy_change(nation, category, new_level):
                         f"{req_cat} >= {min_level} (currently {current})"
                     )
 
-    # Check cross-policy bans
-    # Get the nation's current policy levels (excluding the category being changed)
-    current_policies = dict(
-        NationPolicy.objects.filter(nation=nation)
-        .exclude(category=category)
-        .values_list("category", "level")
-    )
-
-    # Check if any existing policy bans the new level
+    # 5. Check legacy POLICY_BANS
     for (ban_cat, ban_level), banned_list in POLICY_BANS.items():
-        # If this nation currently has (ban_cat, ban_level), check if our
-        # proposed (category, new_level) is in the banned list.
         if ban_cat == category:
-            continue  # same category — can't ban yourself
+            continue
         current = current_policies.get(ban_cat)
         if current is not None and current == ban_level:
             for banned_cat, banned_level in banned_list:
                 if banned_cat == category and banned_level == new_level:
-                    cat_def = POLICY_CATEGORIES.get(ban_cat, {})
-                    ban_level_name = ""
-                    levels = cat_def.get("levels", [])
-                    if ban_level < len(levels):
-                        ban_level_name = levels[ban_level].get("name", "")
                     errors.append(
                         f"Policy {category} level {new_level} is banned by "
-                        f"current policy {ban_cat}: {ban_level_name}"
+                        f"current policy {ban_cat} level {ban_level}"
                     )
 
-    # Also check if the new level would ban any existing policy
     bans_from_new = POLICY_BANS.get((category, new_level), [])
     for banned_cat, banned_level in bans_from_new:
         if banned_cat == category:
-            continue  # same category
+            continue
         current = current_policies.get(banned_cat)
         if current is not None and current == banned_level:
-            cat_def = POLICY_CATEGORIES.get(banned_cat, {})
-            level_name = ""
-            levels = cat_def.get("levels", [])
-            if banned_level < len(levels):
-                level_name = levels[banned_level].get("name", "")
             errors.append(
                 f"Policy {category} level {new_level} conflicts with "
-                f"current policy {banned_cat}: {level_name}"
+                f"current policy {banned_cat} level {banned_level}"
             )
 
     return errors
+
+
+def _get_level_name(category, level):
+    """Get display name for a policy level, or fall back to the index."""
+    cat_def = POLICY_CATEGORIES.get(category, {})
+    levels = cat_def.get("levels", [])
+    if level < len(levels):
+        return levels[level].get("name", str(level))
+    return str(level)
 
 
 def get_policy_building_blocks(nation):
     """
     Return the set of building_types blocked by the nation's current policies.
 
-    Checks BUILDING_POLICY_REQUIREMENTS (all must be met — AND logic) and
-    BUILDING_POLICY_BANS (any match blocks).
+    Checks:
+      1. POLICY_BUILDING_FORBIDDEN — (category, level) → set of building_types
+      2. BUILDING_POLICY_REQUIREMENTS — all prereqs must be met (AND logic)
+      3. BUILDING_POLICY_BANS — any match blocks
     """
     from .models import NationPolicy
 
@@ -245,6 +329,12 @@ def get_policy_building_blocks(nation):
     )
 
     blocked = set()
+
+    # Policy-building forbidden: if nation has (cat, level), block those buildings
+    for (cat, level), forbidden_buildings in POLICY_BUILDING_FORBIDDEN.items():
+        current = current_policies.get(cat)
+        if current is not None and current == level:
+            blocked.update(forbidden_buildings)
 
     # Requirements: all (category, min_level) must be met
     for building_type, requirements in BUILDING_POLICY_REQUIREMENTS.items():

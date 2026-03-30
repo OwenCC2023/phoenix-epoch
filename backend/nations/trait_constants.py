@@ -3,9 +3,27 @@ Ideology trait definitions.
 
 Each nation selects 3 traits from 3 different pairs: 1 strong + 2 weak.
 Strong traits provide larger bonuses; weak traits provide smaller ones.
-Some effects reference systems not yet built — these are stubbed with TODO comments.
 
-Trait effects are structured dicts checked directly by simulation code.
+All values sourced from policy_effects_complete.xlsx "Traits Effects" sheet.
+
+Effect key conventions (matching the 162-column system):
+  stability_bonus        — flat national stability adjustment (additive)
+  growth_bonus/rate      — per-month population growth rate
+  integration_pct        — percentage integration modifier
+  trade_pct              — percentage trade modifier
+  research_bonus         — flat research bonus
+  research_pct           — percentage research modifier
+  military_pct           — percentage military modifier
+  consumption_pct        — percentage consumption modifier
+  production_*_pct       — percentage production modifiers per resource
+  building_efficiency_bonus — dict of category → bonus (additive within trait, stacks with other sources)
+  building_restrictions  — list of building types that cannot be constructed
+  corruption_resistance  — new effect column (additive)
+  environmental_health   — new effect column (additive)
+  worker_productivity    — new effect column (additive, multiplier on building output)
+
+Some effect keys (espionage, diplomacy, trade_capacity, arms_production, training_speed,
+military_upkeep_reduction) await future systems but are tracked here for completeness.
 """
 
 # The 9 mutually exclusive trait pairs.
@@ -29,14 +47,18 @@ TRAIT_DEFS = {
         "description": "Embraces foreign cooperation. Better diplomacy and trade, but citizens expect inclusive policies.",
         "pair_index": 0,
         "strong_effects": {
-            "trade_capacity_bonus": 0.20,               # TODO: wire when trade system built
-            "treaty_bureaucratic_reduction": 0.15,       # TODO: wire when bureaucracy system built
-            "minority_policy_expectation": True,         # TODO: wire when happiness system built
-            "diplomatic_reputation_bonus": 0.10,         # TODO: wire when diplomacy system built
+            "stability_bonus": -1.0,
+            "integration_pct": 0.06,
+            "trade_pct": 0.10,
+            "consumption_pct": 0.03,
+            "trade_capacity_bonus": 0.20,
+            "diplomatic_reputation_bonus": 0.10,
         },
         "weak_effects": {
+            "stability_bonus": -0.5,
+            "integration_pct": 0.03,
+            "trade_pct": 0.05,
             "trade_capacity_bonus": 0.10,
-            "treaty_bureaucratic_reduction": 0.08,
             "diplomatic_reputation_bonus": 0.05,
         },
     },
@@ -45,14 +67,17 @@ TRAIT_DEFS = {
         "description": "Prioritises the homeland. Stronger domestic bonuses but worse foreign relations.",
         "pair_index": 0,
         "strong_effects": {
-            "stability_bonus": 3.0,                     # flat addition to national stability
-            "integration_bonus": 0.05,                   # stacks with base integration efficiency
-            "trade_capacity_penalty": -0.15,             # TODO: wire when trade system built
-            "diplomatic_reputation_penalty": -0.10,      # TODO: wire when diplomacy system built
+            "stability_bonus": 3.0,
+            "integration_pct": 0.05,
+            "military_pct": 0.04,
+            "manpower_bonus": 0.06,
+            "trade_capacity_penalty": -0.15,
+            "diplomatic_reputation_penalty": -0.10,
         },
         "weak_effects": {
-            "stability_bonus": 1.5,
-            "integration_bonus": 0.03,
+            "stability_bonus": 2.0,
+            "integration_pct": 0.03,
+            "manpower_bonus": 0.03,
             "trade_capacity_penalty": -0.08,
         },
     },
@@ -64,9 +89,9 @@ TRAIT_DEFS = {
         "pair_index": 1,
         "strong_effects": {
             "stability_bonus": 4.0,
-            "growth_bonus": 0.001,                       # per-month population growth bonus
-            "research_penalty": -0.10,                   # percentage reduction to research output
-            "literacy_penalty": -0.05,                   # TODO: wire when literacy system built
+            "growth_bonus": 0.001,
+            "research_pct": -0.10,
+            "corruption_resistance": -0.03,
             "building_efficiency_bonus": {
                 "religious": 0.15,
                 "healthcare": 0.06,
@@ -74,8 +99,8 @@ TRAIT_DEFS = {
         },
         "weak_effects": {
             "stability_bonus": 2.0,
-            "growth_bonus": 0.0005,
-            "research_penalty": -0.05,
+            "growth_bonus": 0.001,
+            "research_pct": -0.05,
             "building_efficiency_bonus": {
                 "religious": 0.08,
             },
@@ -86,17 +111,19 @@ TRAIT_DEFS = {
         "description": "Science and reason above all. Faster research but less social cohesion.",
         "pair_index": 1,
         "strong_effects": {
-            "research_bonus": 0.15,                      # percentage bonus to research output
-            "literacy_bonus": 0.10,                      # TODO: wire when literacy system built
-            "stability_penalty": -2.0,
-            "building_efficiency_bonus": {               # specific category bonuses
+            "stability_bonus": -2.0,
+            "research_bonus": 0.15,
+            "literacy_bonus": 0.04,
+            "corruption_resistance": 0.03,
+            "building_efficiency_bonus": {
                 "communications": 0.08,
                 "pharmaceutical": 0.06,
             },
         },
         "weak_effects": {
+            "stability_bonus": -1.0,
             "research_bonus": 0.08,
-            "stability_penalty": -1.0,
+            "literacy_bonus": 0.02,
             "building_efficiency_bonus": {
                 "communications": 0.04,
             },
@@ -109,31 +136,40 @@ TRAIT_DEFS = {
         "description": "Minimal government interference. Lower upkeep, but harder to enforce policies.",
         "pair_index": 2,
         "strong_effects": {
-            "upkeep_reduction": 0.12,                    # fraction reduction in gov upkeep
-            "policy_change_resistance": 0.15,            # TODO: wire when happiness system built
+            "stability_bonus": -2.0,
+            "trade_pct": 0.05,
+            "upkeep_reduction": 0.12,
             "wealth_production_bonus": 0.08,
-            "conscription_penalty": -0.20,               # TODO: wire when military system built
+            "production_wealth_pct": 0.06,
+            "corruption_resistance": 0.03,
         },
         "weak_effects": {
+            "stability_bonus": -1.0,
+            "trade_pct": 0.03,
             "upkeep_reduction": 0.06,
             "wealth_production_bonus": 0.04,
-            "conscription_penalty": -0.10,
         },
     },
     "authoritarian": {
         "name": "Authoritarian",
-        "description": "Strong central control. Faster policy changes and higher manpower, but lower growth.",
+        "description": "Strong central control. Higher manpower and stability, but lower growth.",
         "pair_index": 2,
         "strong_effects": {
-            "manpower_bonus": 0.12,                      # percentage bonus to manpower production
-            "policy_change_speed": 0.20,                 # TODO: wire when policy delay system built
-            "growth_penalty": -0.001,                    # per-month population growth penalty
-            "bureaucratic_capacity_bonus": 0.10,         # TODO: wire when bureaucracy system built
+            "stability_bonus": 3.0,
+            "growth_rate": -0.001,
+            "manpower_bonus": 0.12,
+            "corruption_resistance": -0.04,
+            "building_efficiency_bonus": {
+                "government_security": 0.06,
+            },
         },
         "weak_effects": {
+            "stability_bonus": 2.0,
+            "growth_rate": -0.001,
             "manpower_bonus": 0.06,
-            "policy_change_speed": 0.10,
-            "growth_penalty": -0.0005,
+            "building_efficiency_bonus": {
+                "government_security": 0.03,
+            },
         },
     },
 
@@ -145,15 +181,17 @@ TRAIT_DEFS = {
         "strong_effects": {
             "stability_bonus": 3.0,
             "growth_bonus": 0.001,
+            "trade_pct": 0.04,
+            "consumption_pct": 0.03,
             "military_upkeep_reduction": 0.25,
+            "arms_production_penalty": -0.30,
             "building_restrictions": ["arms_factory", "weapons_factory"],
-            "arms_production_penalty": -0.30,            # TODO: apply to arms_factory output
         },
         "weak_effects": {
-            "stability_bonus": 1.5,
-            "growth_bonus": 0.0005,
+            "stability_bonus": 2.0,
+            "growth_bonus": 0.001,
+            "trade_pct": 0.02,
             "military_upkeep_reduction": 0.12,
-            "building_restrictions": [],
             "arms_production_penalty": -0.15,
         },
     },
@@ -162,28 +200,25 @@ TRAIT_DEFS = {
         "description": "Military strength is national strength. Better arms output but higher instability.",
         "pair_index": 3,
         "strong_effects": {
+            "stability_bonus": -3.0,
+            "military_pct": 0.06,
             "manpower_bonus": 0.15,
-            "stability_penalty": -3.0,
+            "training_speed_bonus": 0.20,
+            "arms_production_bonus": 0.20,
             "building_efficiency_bonus": {
                 "heavy_manufacturing": 0.10,
                 "chemical": 0.06,
-                "military_army": 0.10,
-                "military_naval": 0.08,
-                "military_air": 0.08,
             },
-            "training_speed_bonus": 0.20,
-            "arms_production_bonus": 0.20,               # TODO: apply to arms_factory output
-            "military_organisation_bonus": 0.15,         # TODO: wire when combat system built
         },
         "weak_effects": {
+            "stability_bonus": -2.0,
+            "military_pct": 0.03,
             "manpower_bonus": 0.08,
-            "stability_penalty": -1.5,
-            "building_efficiency_bonus": {
-                "heavy_manufacturing": 0.05,
-                "military_army": 0.05,
-            },
             "training_speed_bonus": 0.10,
             "arms_production_bonus": 0.10,
+            "building_efficiency_bonus": {
+                "heavy_manufacturing": 0.05,
+            },
         },
     },
 
@@ -193,15 +228,17 @@ TRAIT_DEFS = {
         "description": "The ends justify the means. Better espionage but worse diplomatic reputation.",
         "pair_index": 4,
         "strong_effects": {
-            "espionage_effectiveness": 0.25,             # TODO: wire when espionage system built
-            "counter_espionage": 0.10,                   # TODO: wire when espionage system built
-            "diplomatic_reputation_penalty": -0.15,      # TODO: wire when diplomacy system built
-            "treaty_break_cost_reduction": 0.30,         # TODO: wire when diplomacy system built
+            "trade_pct": 0.03,
+            "espionage_bonus": 0.25,
+            "counter_espionage_bonus": 0.10,
+            "diplomatic_reputation_penalty": -0.15,
+            "corruption_resistance": -0.05,
         },
         "weak_effects": {
-            "espionage_effectiveness": 0.12,
-            "counter_espionage": 0.05,
+            "espionage_bonus": 0.12,
+            "counter_espionage_bonus": 0.05,
             "diplomatic_reputation_penalty": -0.08,
+            "corruption_resistance": -0.02,
         },
     },
     "honorable": {
@@ -209,15 +246,15 @@ TRAIT_DEFS = {
         "description": "Deals are sacred. Better diplomatic reputation but vulnerable to espionage.",
         "pair_index": 4,
         "strong_effects": {
-            "diplomatic_reputation_bonus": 0.15,         # TODO: wire when diplomacy system built
-            "trade_trust_bonus": 0.20,                   # TODO: wire when trade system built
-            "espionage_vulnerability": 0.15,             # TODO: wire when espionage system built
             "stability_bonus": 2.0,
+            "trade_pct": -0.02,
+            "diplomatic_reputation_bonus": 0.15,
+            "corruption_resistance": 0.04,
         },
         "weak_effects": {
-            "diplomatic_reputation_bonus": 0.08,
-            "trade_trust_bonus": 0.10,
             "stability_bonus": 1.0,
+            "diplomatic_reputation_bonus": 0.08,
+            "corruption_resistance": 0.02,
         },
     },
 
@@ -227,17 +264,21 @@ TRAIT_DEFS = {
         "description": "All citizens are equal. Higher growth and stability, but less research output.",
         "pair_index": 5,
         "strong_effects": {
-            "growth_bonus": 0.001,
             "stability_bonus": 2.0,
-            "happiness_baseline_bonus": 5.0,             # TODO: wire when happiness system built
-            "research_penalty": -0.05,
-            "elite_institution_penalty": -0.08,          # TODO: wire when education system built
+            "growth_bonus": 0.001,
+            "integration_pct": 0.04,
+            "research_pct": -0.05,
+            "worker_productivity": 0.02,
+            "building_efficiency_bonus": {
+                "government_welfare": 0.04,
+            },
         },
         "weak_effects": {
-            "growth_bonus": 0.0005,
             "stability_bonus": 1.0,
-            "happiness_baseline_bonus": 2.5,
-            "research_penalty": -0.03,
+            "growth_bonus": 0.001,
+            "integration_pct": 0.02,
+            "research_pct": -0.03,
+            "worker_productivity": 0.01,
         },
     },
     "elitist": {
@@ -245,40 +286,42 @@ TRAIT_DEFS = {
         "description": "Merit and talent rise to the top. Better research and specialisation, but lower growth.",
         "pair_index": 5,
         "strong_effects": {
+            "growth_rate": -0.001,
             "research_bonus": 0.12,
+            "wealth_production_bonus": 0.06,
             "building_efficiency_bonus": {
                 "financial": 0.08,
                 "light_manufacturing": 0.06,
             },
-            "growth_penalty": -0.0005,
-            "happiness_baseline_penalty": -3.0,          # TODO: wire when happiness system built
         },
         "weak_effects": {
             "research_bonus": 0.06,
+            "wealth_production_bonus": 0.03,
             "building_efficiency_bonus": {
                 "financial": 0.04,
             },
-            "growth_penalty": -0.0003,
         },
     },
 
     # --- Pair 6: Collectivist / Individualist ---
     "collectivist": {
         "name": "Collectivist",
-        "description": "The community comes first. Lower government building costs, but policy constraints.",
+        "description": "The community comes first. Better integration and food production.",
         "pair_index": 6,
         "strong_effects": {
-            "government_building_cost_reduction": 0.15,
-            "integration_bonus": 0.05,
-            "policy_constraints": {"min_social_spending": 2},  # TODO: wire when policy enforcement built
+            "integration_pct": 0.05,
+            "production_food_pct": 0.04,
+            "worker_productivity": 0.02,
             "building_efficiency_bonus": {
                 "farming": 0.06,
                 "construction": 0.06,
+                "government_welfare": 0.03,
             },
         },
         "weak_effects": {
-            "government_building_cost_reduction": 0.08,
-            "integration_bonus": 0.03,
+            "integration_pct": 0.03,
+            "production_food_pct": 0.02,
+            "worker_productivity": 0.01,
             "building_efficiency_bonus": {
                 "farming": 0.03,
             },
@@ -286,20 +329,20 @@ TRAIT_DEFS = {
     },
     "individualist": {
         "name": "Individualist",
-        "description": "Individual freedom drives innovation. Better commerce but higher government costs.",
+        "description": "Individual freedom drives innovation. Better commerce but less stability.",
         "pair_index": 6,
         "strong_effects": {
+            "stability_bonus": -1.0,
             "wealth_production_bonus": 0.10,
-            "government_building_cost_increase": 0.10,
+            "production_wealth_pct": 0.06,
             "building_efficiency_bonus": {
                 "financial": 0.08,
                 "entertainment": 0.06,
             },
-            "entrepreneurship_bonus": 0.15,              # TODO: wire when private sector system built
         },
         "weak_effects": {
             "wealth_production_bonus": 0.05,
-            "government_building_cost_increase": 0.05,
+            "production_wealth_pct": 0.03,
             "building_efficiency_bonus": {
                 "financial": 0.04,
             },
@@ -312,10 +355,12 @@ TRAIT_DEFS = {
         "description": "Production above all. Urban provinces thrive, but rural areas suffer.",
         "pair_index": 7,
         "strong_effects": {
-            "urban_output_bonus": 0.15,                  # building output multiplier in urban provinces
-            "urban_migration_bonus": 0.015,              # bias economic migration toward urban
-            "urban_threshold_reduction": 15000,           # reduce URBAN_THRESHOLD score needed
+            "urban_output_bonus": 0.15,
+            "urban_threshold_reduction": 15000,
             "rural_output_penalty": -0.05,
+            "production_materials_pct": 0.06,
+            "production_energy_pct": 0.04,
+            "environmental_health": -0.06,
             "building_efficiency_bonus": {
                 "heavy_manufacturing": 0.08,
                 "refining": 0.06,
@@ -323,8 +368,9 @@ TRAIT_DEFS = {
         },
         "weak_effects": {
             "urban_output_bonus": 0.08,
-            "urban_migration_bonus": 0.008,
             "urban_threshold_reduction": 8000,
+            "production_materials_pct": 0.03,
+            "environmental_health": -0.03,
             "building_efficiency_bonus": {
                 "heavy_manufacturing": 0.04,
             },
@@ -335,9 +381,9 @@ TRAIT_DEFS = {
         "description": "Harmony with nature. Rural provinces produce more, but urban areas are penalised.",
         "pair_index": 7,
         "strong_effects": {
-            "rural_output_bonus": 0.15,                  # subsistence output multiplier in rural provinces
-            "urban_growth_penalty": -0.003,              # per-month growth penalty in urban provinces
-            "urban_emigration_bonus": 0.015,             # bias migration away from urban
+            "rural_output_bonus": 0.15,
+            "urban_growth_penalty": -0.003,
+            "environmental_health": 0.08,
             "building_restrictions": ["refinery", "advanced_refinery", "oil_well", "fuel_depot"],
             "building_efficiency_bonus": {
                 "farming": 0.10,
@@ -348,7 +394,7 @@ TRAIT_DEFS = {
         "weak_effects": {
             "rural_output_bonus": 0.08,
             "urban_growth_penalty": -0.001,
-            "urban_emigration_bonus": 0.008,
+            "environmental_health": 0.04,
             "building_restrictions": ["refinery", "advanced_refinery", "oil_well", "fuel_depot"],
             "building_efficiency_bonus": {
                 "farming": 0.05,
@@ -363,17 +409,19 @@ TRAIT_DEFS = {
         "description": "Embrace the new world. Faster research and communications, but less stability.",
         "pair_index": 8,
         "strong_effects": {
+            "stability_bonus": -2.0,
             "research_bonus": 0.10,
-            "stability_penalty": -2.0,
+            "literacy_bonus": 0.03,
+            "corruption_resistance": 0.02,
             "building_efficiency_bonus": {
                 "communications": 0.10,
                 "light_manufacturing": 0.06,
             },
-            "technology_adoption_speed": 0.20,           # TODO: wire when tech tree built
         },
         "weak_effects": {
+            "stability_bonus": -1.0,
             "research_bonus": 0.05,
-            "stability_penalty": -1.0,
+            "literacy_bonus": 0.01,
             "building_efficiency_bonus": {
                 "communications": 0.05,
             },
@@ -385,18 +433,18 @@ TRAIT_DEFS = {
         "pair_index": 8,
         "strong_effects": {
             "stability_bonus": 3.0,
-            "food_production_bonus": 0.08,               # percentage bonus to food production
-            "research_penalty": -0.08,
+            "food_production_bonus": 0.08,
+            "research_pct": -0.08,
             "building_efficiency_bonus": {
                 "farming": 0.08,
                 "healthcare": 0.06,
+                "religious": 0.04,
             },
-            "technology_adoption_penalty": -0.15,        # TODO: wire when tech tree built
         },
         "weak_effects": {
-            "stability_bonus": 1.5,
+            "stability_bonus": 2.0,
             "food_production_bonus": 0.04,
-            "research_penalty": -0.04,
+            "research_pct": -0.04,
             "building_efficiency_bonus": {
                 "farming": 0.04,
             },

@@ -32,6 +32,7 @@ get_level_data(building_type, level) from provinces.building_constants.
 _POOL_RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
 
 from provinces.constants import DESIGNATION_BUILDING_MODIFIER
+from .happiness import get_happiness_worker_productivity
 
 
 # ---------------------------------------------------------------------------
@@ -487,6 +488,17 @@ def simulate_building_production(
         province_building_outputs[province.id] = outputs
 
     # ------------------------------------------------------------------
+    # Pre-compute per-province happiness worker productivity multipliers.
+    # province_job_status stores local_happiness set during the province loop.
+    # ------------------------------------------------------------------
+    province_happiness_mult = {
+        province.id: get_happiness_worker_productivity(
+            province_job_status.get(province.id, {}).get("local_happiness", 50.0)
+        )
+        for province in provinces
+    }
+
+    # ------------------------------------------------------------------
     # Collect active buildings, split input needs by sector.
     # Tuple: (building, level_data, worker_capacity_factor, designation,
     #         province_terrain, province_id, sector)
@@ -564,7 +576,7 @@ def simulate_building_production(
                 setattr(good_stock, good, max(0.0, getattr(good_stock, good, 0.0) - deduct))
                 stock_dirty = True
 
-        productivity_mult = 1.0 + worker_productivity
+        productivity_mult = (1.0 + worker_productivity) * province_happiness_mult.get(province_id, 1.0)
         for good, amount in level_data["output_goods"].items():
             produce = round(amount * effective_capacity * designation_mult * efficiency_mult * productivity_mult, 4)
             if good in _POOL_RESOURCE_KEYS:

@@ -12,6 +12,7 @@ class NationResourcePool(models.Model):
     manpower = models.FloatField(default=0)
     research = models.FloatField(default=0)
     stability = models.FloatField(default=50.0)
+    happiness = models.FloatField(default=50.0)
     total_population = models.PositiveIntegerField(default=0)
     consecutive_food_deficit_turns = models.PositiveIntegerField(default=0)
 

@@ -218,7 +218,13 @@ def simulate_migration(provinces, province_growth_rates):
             if actual_outflow > 0:
                 sending.append((province, actual_outflow))
         elif rate > 0:
-            receiving.append((province, rate))
+            # Weight destination by growth rate × happiness × security.
+            # A province at base happiness (50) and security (30) is neutral.
+            # Very unhappy or insecure provinces attract proportionally fewer migrants.
+            happiness_mult = max(0.1, getattr(province, "local_happiness", 50.0) / 50.0)
+            security_mult = max(0.1, getattr(province, "local_security", 30.0) / 50.0)
+            weight = rate * happiness_mult * security_mult
+            receiving.append((province, weight))
 
     if not sending:
         return net_immigration  # nobody is declining enough to trigger starvation migration
@@ -278,12 +284,17 @@ def simulate_economic_migration(provinces, province_growth_rates, province_job_s
         is acceptable given the small magnitudes involved.
     """
     # --- Destinations: growing/stable provinces with unfilled building jobs ---
+    # Attractiveness = unfilled_jobs × happiness_mult × security_mult.
+    # Very unhappy or insecure provinces attract fewer economic migrants.
     destinations = []
     for province in provinces:
         status = province_job_status.get(province.id, {})
         rate = province_growth_rates.get(province.id, 0.0)
         if status.get("unfilled_jobs", 0) > 0 and rate >= 0:
-            destinations.append((province, status["unfilled_jobs"]))
+            happiness_mult = max(0.1, getattr(province, "local_happiness", 50.0) / 50.0)
+            security_mult = max(0.1, getattr(province, "local_security", 30.0) / 50.0)
+            attractiveness = status["unfilled_jobs"] * happiness_mult * security_mult
+            destinations.append((province, attractiveness))
 
     if not destinations:
         return {}  # no economic pull anywhere

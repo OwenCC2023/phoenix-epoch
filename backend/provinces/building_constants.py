@@ -70,6 +70,7 @@ PROVINCE_EFFECT_KEYS = [
     "sea_transit_speed",       # province-scope sea embarkation speed (dock, port)
     "river_transit_speed",     # province-scope river crossing speed (dock, bridge)
     "air_transit_speed",       # province-scope air transition speed (airport)
+    "provincial_espionage_defense",  # provincial espionage defense from local_office
 ]
 
 # Effect keys that apply at the national level (sum across all provinces)
@@ -94,6 +95,9 @@ NATIONAL_EFFECT_KEYS = [
     "army_upkeep_reduction",        # fraction reduction in army unit upkeep
     "navy_upkeep_reduction",        # fraction reduction in navy unit upkeep
     "air_upkeep_reduction",         # fraction reduction in air unit upkeep
+    # Espionage effects
+    "espionage_attack",             # national espionage attack from buildings
+    "espionage_defense",            # national espionage defense from buildings
 ]
 
 # Sector classification for all building types.
@@ -184,7 +188,6 @@ BUILDING_SECTOR = {
     "civil_service_academy": "government",
     "administrative_center": "government",
     "police_headquarters":   "government",
-    "intelligence_agency":   "government",
     "police_station":        "government",
     "sheriffs_office":       "government",
     "fire_house":            "government",
@@ -204,6 +207,11 @@ BUILDING_SECTOR = {
     "military_academy":      "military",
     "naval_war_college":     "military",
     "air_force_academy":     "military",
+    # ----- Espionage -----
+    "foreign_intel_hq":      "government",
+    "branch_office":         "government",
+    "domestic_intel_hq":     "government",
+    "local_office":          "government",
 }
 
 
@@ -1066,17 +1074,6 @@ BUILDING_TYPES = {
         "base_construction_turns": 9,
         "base_effects": {"security": 10, "stability_recovery_bonus": 0.15, "bureaucratic_capacity": 8},
     },
-    "intelligence_agency": {
-        "label": "Intelligence Agency",
-        "category": "government_security",
-        "description": "Covert operations centre providing stability through information control and threat prevention.",
-        "base_workers": 100,
-        "base_inputs": {"wealth": 120, "research": 40},
-        "base_outputs": {},
-        "base_construction_cost": {"materials": 600, "wealth": 600},
-        "base_construction_turns": 7,
-        "base_effects": {"stability_recovery_bonus": 0.10, "integration_bonus": 0.03, "bureaucratic_capacity": 12},
-    },
     "police_station": {
         "label": "Police Station",
         "category": "government_security",
@@ -1314,6 +1311,74 @@ BUILDING_TYPES = {
             "air_transit_speed": 0.03,
             "air_upkeep_reduction": 0.04,
         },
+    },
+
+    # ============================================================
+    # ESPIONAGE
+    # Two attack buildings (espionage_attack category) and two
+    # defense buildings (espionage_defense category).
+    # Foreign Intel HQ and Domestic Intel HQ are nation-unique.
+    # ============================================================
+    "foreign_intel_hq": {
+        "label": "Foreign Intelligence Agency HQ",
+        "category": "espionage_attack",
+        "description": (
+            "Central command for foreign intelligence operations. "
+            "Each level enables one additional simultaneous foreign espionage target. "
+            "Nation-unique — only one may exist across all provinces."
+        ),
+        "unique_per_nation": True,
+        "base_workers": 150,
+        "base_inputs": {"wealth": 200, "research": 60},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 800, "wealth": 1200},
+        "base_construction_turns": 10,
+        "base_effects": {"espionage_attack": 8},
+    },
+    "branch_office": {
+        "label": "Intelligence Branch Office",
+        "category": "espionage_attack",
+        "description": (
+            "Regional intelligence office. Must be specialized in a foreign action "
+            "after construction via a separate order. Each level allows one additional "
+            "simultaneous use of its specialized action."
+        ),
+        "base_workers": 80,
+        "base_inputs": {"wealth": 80, "research": 20},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 400, "wealth": 500},
+        "base_construction_turns": 6,
+        "base_effects": {"espionage_attack": 3},
+    },
+    "domestic_intel_hq": {
+        "label": "Domestic Intelligence Agency HQ",
+        "category": "espionage_defense",
+        "description": (
+            "Counter-intelligence headquarters. Boosts national defense and enables "
+            "Suppress Foreign Operations actions. "
+            "Nation-unique — only one may exist across all provinces."
+        ),
+        "unique_per_nation": True,
+        "base_workers": 140,
+        "base_inputs": {"wealth": 180, "research": 40},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 700, "wealth": 900},
+        "base_construction_turns": 8,
+        "base_effects": {"espionage_defense": 8},
+    },
+    "local_office": {
+        "label": "Local Intelligence Office",
+        "category": "espionage_defense",
+        "description": (
+            "Provincial counter-intelligence office. Boosts this province's defense "
+            "against foreign espionage operations."
+        ),
+        "base_workers": 50,
+        "base_inputs": {"wealth": 50},
+        "base_outputs": {},
+        "base_construction_cost": {"materials": 250, "wealth": 300},
+        "base_construction_turns": 5,
+        "base_effects": {"provincial_espionage_defense": 5},
     },
 }
 

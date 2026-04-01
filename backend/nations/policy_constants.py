@@ -54,7 +54,12 @@ POLICY_BANS = {}
 # ALL requirements must be met (AND logic).
 # =============================================================================
 
-BUILDING_POLICY_REQUIREMENTS = {}
+BUILDING_POLICY_REQUIREMENTS = {
+    # Espionage buildings require their respective intelligence agency policies
+    "foreign_intel_hq": [("foreign_intelligence_agency", 1)],   # FIA >= Minimal
+    "branch_office": [("foreign_intelligence_agency", 1)],       # FIA >= Minimal
+    "domestic_intel_hq": [("domestic_intelligence_agency", 1)],  # DIA >= Minimal
+}
 
 
 # =============================================================================

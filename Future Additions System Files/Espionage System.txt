@@ -41,7 +41,7 @@ Tie-ins with other systems:
 		- Attack: Positive relative stability vs target nation adds to effective National Attack. Needs tiered breakpoints.
 		- Defense: Positive relative stability vs attacker adds to effective National Defense. Needs tiered breakpoints.
 		- Relative stability can only impart a positive modifier. 
-	- National Security:
+	- Security:
 		- [See Existing Building Changes].
 	- Happiness:
 		- 
@@ -61,7 +61,7 @@ Transparency:
 			- Target's Foreign Espionage: which nations are being targeted within the espionage system by the target.
 		- List of information by ease [easiest to hardest]: {Building-Locations, Province-Level Info, Positions of Formations, Target's COINTEL, Target's Foreign Espionage}
 		- How is "quantity of information" calculated for "easiest x %"?
-			-
+			- Take the total amount of available information the target has that could be obtained by 100% Transparency, then return the % that the target is actually Transparent. Building locations are easiest within the most populous provinces and hardest in the least populous. Other categories follow a similar trend. Target's Foreign Espionage is given only if there is enough transparency to cover an entire increment, and the resulting operation is chosen at random from the list. [This is probably the hardest thing here to implement. If you have questions, please ask.]
 	- IMPORTANT NOTE: The player needs a toggle to make information on their own nation visible to others within the espionage system. This control needs to be granular at the foreign-nation level so that a player can allow a specific other player to view a certain category of hidden information.
 
 Actions:
@@ -70,8 +70,10 @@ Actions:
 		- Promote Foreign Ideology: Causes unhappy or unsecure populations be more unstable. Also generates base instability.
 		- Terrorist Attack: Kill a small number of pops and cause a massive temporary decrease to security.
 		- Sabotage Building: Take a specific building in a specific province offline for a time. Length of disablement determined by Transparency, with greater Transparency yielding a longer time.
+		- [Make this expandable for future additions].
 	- Domestic:
 		- Suppress Foreign Operations: boost Provincial Defense in one province.
+		- [Make this expandable for future additions].
 
 Existing Building Changes:
 	- REMOVE: Intelligence Agency
@@ -83,3 +85,6 @@ Added Buildings:
 	- Defense Buildings [name: effects]:
 		- Domestic Intel Agency HQ: Boosts National Defense for each level. Allows one addition simultaneous Suppress Foreign Operations Action for each level.
 		- Local Office: Boosts Provincial Defense for each level.
+
+Legend:
+	- text within [] indicates instructions to the agent reviewing the file. Instructions could cover how to read a section, or how to respond to certain information.

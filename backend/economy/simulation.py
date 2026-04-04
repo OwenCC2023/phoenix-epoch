@@ -39,6 +39,11 @@ from .literacy import (
     get_national_literacy,
     get_literacy_research_multiplier,
 )
+from .normalization import (
+    check_normalization_completion,
+    compute_normalization_penalties,
+    drift_unclaimed_ideology,
+)
 
 
 RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
@@ -85,6 +90,7 @@ def _compute_unit_needs(nation, trait_effects):
 def simulate_economy_for_game(game, turn_number):
     """Run the full economy simulation for all nations in a game."""
     from nations.models import Nation
+    from provinces.models import Province
 
     nations = Nation.objects.filter(game=game, is_alive=True).prefetch_related(
         "provinces__buildings",
@@ -94,6 +100,12 @@ def simulate_economy_for_game(game, turn_number):
 
     for nation in nations:
         simulate_nation_economy(nation, turn_number)
+
+    # Drift ideology of unclaimed provinces (no nation).
+    unclaimed = Province.objects.filter(game=game, nation__isnull=True)
+    for province in unclaimed:
+        drift_unclaimed_ideology(province)
+        province.save(update_fields=["ideology_traits"])
 
 
 @transaction.atomic
@@ -360,15 +372,33 @@ def simulate_nation_economy(nation, turn_number):
         )
         happiness_recovery_mult = get_happiness_stability_recovery_multiplier(province.local_happiness)
 
+        # Step 6b-bis: Normalization penalties for non-core provinces.
+        # Check if normalization has completed first (promotes to core).
+        # If still normalizing, apply happiness and stability penalties that
+        # decrease linearly as the province integrates.
+        normalization_stability_penalty = 0.0
+        if not province.is_core:
+            just_completed = check_normalization_completion(province, nation, turn_number)
+            if not just_completed:
+                norm_stab_pen, norm_hap_pen = compute_normalization_penalties(
+                    province, nation, turn_number
+                )
+                province.local_happiness = max(0.0, province.local_happiness - norm_hap_pen)
+                normalization_stability_penalty = norm_stab_pen
+
         effective_recovery = (
             (STABILITY_RECOVERY_RATE + bldg_effects.get("stability_recovery_bonus", 0.0))
             * security_stability_mult
             * happiness_recovery_mult
         )
         if effective_food < local_food_consumption:
-            province.local_stability = max(0, province.local_stability - STABILITY_FOOD_DEFICIT_PENALTY)
+            province.local_stability = max(
+                0, province.local_stability - STABILITY_FOOD_DEFICIT_PENALTY - normalization_stability_penalty
+            )
         else:
-            province.local_stability = min(100, province.local_stability + effective_recovery)
+            province.local_stability = min(
+                100, province.local_stability + effective_recovery - normalization_stability_penalty
+            )
 
         # Store growth_bonus and happiness for use in Step 13
         province_job_status[province.id]["growth_bonus"] = bldg_effects.get("growth_bonus", 0.0)
@@ -384,7 +414,10 @@ def simulate_nation_economy(nation, turn_number):
         resources_obj.save()
 
         province.designation = designation
-        province.save(update_fields=["local_stability", "local_security", "local_happiness", "literacy", "designation"])
+        province.save(update_fields=[
+            "local_stability", "local_security", "local_happiness", "literacy", "designation",
+            "ideology_traits", "is_core", "normalization_started_turn", "normalization_duration",
+        ])
 
         ProvinceLedger.objects.create(
             province=province,

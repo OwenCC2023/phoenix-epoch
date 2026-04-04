@@ -201,6 +201,46 @@ class NationResearchView(APIView):
         })
 
 
+class NationAcquirableProvincesView(APIView):
+    """
+    GET /api/games/{game_id}/nations/{nation_id}/acquirable/
+
+    Returns unclaimed provinces in this game that pass location requirements
+    for the given nation, along with the economic acquisition cost.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, game_id, nation_id):
+        from provinces.models import Province
+        from economy.normalization import check_location_requirements
+        from economy.integration_constants import ECONOMIC_ACQUISITION_COSTS
+
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        unclaimed = Province.objects.filter(
+            game_id=game_id,
+            nation__isnull=True,
+        ).prefetch_related("adjacent_provinces", "adjacent_sea_zones", "adjacent_river_zones")
+
+        acquirable = []
+        for province in unclaimed:
+            if check_location_requirements(province, nation):
+                acquirable.append({
+                    "province_id": province.id,
+                    "name": province.name,
+                    "terrain_type": province.terrain_type,
+                    "population": province.population,
+                    "ideology_traits": province.ideology_traits,
+                    "acquisition_cost": ECONOMIC_ACQUISITION_COSTS,
+                })
+
+        return Response({"acquirable_provinces": acquirable})
+
+
 class TradeOfferResponseView(APIView):
     """POST /api/games/{game_id}/trades/{pk}/respond/ with {"action": "accept"/"reject"}"""
 

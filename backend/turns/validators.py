@@ -21,6 +21,7 @@ def validate_order(order):
         "espionage_action": _validate_espionage_action,
         "specialize_branch_office": _validate_specialize_branch_office,
         "research_unlock": _validate_research_unlock,
+        "acquire_province": _validate_acquire_province,
     }
 
     validator = validators.get(order.order_type)
@@ -572,69 +573,334 @@ def _validate_assign_formation_to_group(order):
 
 def _validate_espionage_action(order):
     """Validate espionage action order.
-    Payload: {"action_type": str, "target_nation_id": int, "target_province_id": int (optional)}
+    Payload: {
+        "action_type": str,
+        "target_nation_id": int,        (required for foreign actions)
+        "target_province_id": int,      (required for some actions)
+        "target_building_type": str     (required for sabotage_building)
+    }
     """
-    from espionage.constants import ESPIONAGE_ACTION_DEFS
-    from nations.models import Nation
+    errors = []
+    payload = order.payload
+
+    from espionage.constants import ESPIONAGE_ACTION_DEFS, FOREIGN_ACTION_TYPES
+    from espionage.slots import get_foreign_target_slots, get_action_type_slots, get_suppress_slots
+    from espionage.models import EspionageAction
+    from nations.models import Nation, NationPolicy
+    from provinces.models import Province
+
+    action_type = payload.get("action_type")
+    if action_type not in ESPIONAGE_ACTION_DEFS:
+        errors.append(f"Invalid action_type: {action_type}")
+        return errors
+
+    action_def = ESPIONAGE_ACTION_DEFS[action_type]
+
+    if action_def["type"] == "foreign":
+        # persuade_to_join targets an unclaimed province, not a nation
+        if action_type == "persuade_to_join":
+            return _validate_persuade_to_join(order, action_def)
+
+        # --- Foreign action validation ---
+        target_nation_id = payload.get("target_nation_id")
+        if not target_nation_id:
+            errors.append("Missing target_nation_id for foreign action")
+            return errors
+
+        if target_nation_id == order.nation_id:
+            errors.append("Cannot target own nation with foreign espionage action")
+            return errors
+
+        try:
+            target_nation = Nation.objects.get(pk=target_nation_id, game=order.turn.game)
+        except Nation.DoesNotExist:
+            errors.append("Target nation not found")
+            return errors
+
+        if not target_nation.is_alive:
+            errors.append("Target nation is not alive")
+            return errors
+
+        # Check FIA policy level
+        min_fia = action_def.get("min_fia_level", 1)
+        try:
+            fia_policy = NationPolicy.objects.get(
+                nation_id=order.nation_id, category="foreign_intelligence_agency"
+            )
+            fia_level = fia_policy.level
+        except NationPolicy.DoesNotExist:
+            fia_level = 0
+
+        if fia_level < min_fia:
+            errors.append(
+                f"Requires foreign_intelligence_agency at level {min_fia} or higher "
+                f"(currently {fia_level})"
+            )
+            return errors
+
+        # Check foreign_intel_hq building exists
+        from provinces.models import Building
+        hq = Building.objects.filter(
+            province__nation_id=order.nation_id,
+            building_type="foreign_intel_hq",
+            is_active=True,
+            under_construction=False,
+        ).first()
+        if not hq:
+            errors.append("No active Foreign Intelligence Agency HQ building")
+            return errors
+
+        # Check slot limits: foreign target count
+        max_targets = get_foreign_target_slots(order.nation)
+        active_targets = EspionageAction.objects.filter(
+            game=order.turn.game,
+            nation_id=order.nation_id,
+            action_type__in=FOREIGN_ACTION_TYPES,
+            status=EspionageAction.Status.ACTIVE,
+        ).values_list("target_nation_id", flat=True).distinct()
+
+        current_targets = set(active_targets)
+        if target_nation_id not in current_targets and len(current_targets) >= max_targets:
+            errors.append(
+                f"Already targeting {len(current_targets)} nations "
+                f"(max {max_targets} from Foreign Intel HQ level {hq.level})"
+            )
+            return errors
+
+        # Check per-action-type slots (branch office capacity)
+        max_action_slots = get_action_type_slots(order.nation, action_type)
+        active_of_type = EspionageAction.objects.filter(
+            game=order.turn.game,
+            nation_id=order.nation_id,
+            action_type=action_type,
+            status=EspionageAction.Status.ACTIVE,
+        ).count()
+
+        if active_of_type >= max_action_slots:
+            errors.append(
+                f"No available slots for {action_type} "
+                f"({active_of_type}/{max_action_slots} used)"
+            )
+            return errors
+
+        # Action-specific validation
+        target_province_id = payload.get("target_province_id")
+        if action_type in ("investigate_province", "promote_foreign_ideology", "terrorist_attack"):
+            if not target_province_id:
+                errors.append(f"Missing target_province_id for {action_type}")
+                return errors
+            try:
+                target_prov = Province.objects.get(pk=target_province_id)
+                if target_prov.nation_id != target_nation_id:
+                    errors.append("Target province does not belong to target nation")
+            except Province.DoesNotExist:
+                errors.append("Target province not found")
+
+        if action_type == "sabotage_building":
+            if not target_province_id:
+                errors.append("Missing target_province_id for sabotage_building")
+                return errors
+            target_building_type = payload.get("target_building_type")
+            if not target_building_type:
+                errors.append("Missing target_building_type for sabotage_building")
+                return errors
+            try:
+                target_prov = Province.objects.get(pk=target_province_id)
+                if target_prov.nation_id != target_nation_id:
+                    errors.append("Target province does not belong to target nation")
+                elif not Building.objects.filter(
+                    province=target_prov,
+                    building_type=target_building_type,
+                    is_active=True,
+                    under_construction=False,
+                ).exists():
+                    errors.append(
+                        f"No active {target_building_type} building in target province"
+                    )
+            except Province.DoesNotExist:
+                errors.append("Target province not found")
+
+    elif action_def["type"] == "domestic":
+        # --- Domestic action validation ---
+        min_dia = action_def.get("min_dia_level", 1)
+        try:
+            dia_policy = NationPolicy.objects.get(
+                nation_id=order.nation_id, category="domestic_intelligence_agency"
+            )
+            dia_level = dia_policy.level
+        except NationPolicy.DoesNotExist:
+            dia_level = 0
+
+        if dia_level < min_dia:
+            errors.append(
+                f"Requires domestic_intelligence_agency at level {min_dia} or higher "
+                f"(currently {dia_level})"
+            )
+            return errors
+
+        # Check domestic_intel_hq building
+        from provinces.models import Building
+        hq = Building.objects.filter(
+            province__nation_id=order.nation_id,
+            building_type="domestic_intel_hq",
+            is_active=True,
+            under_construction=False,
+        ).first()
+        if not hq:
+            errors.append("No active Domestic Intelligence Agency HQ building")
+            return errors
+
+        # Check suppress slots
+        max_suppress = get_suppress_slots(order.nation)
+        active_suppress = EspionageAction.objects.filter(
+            game=order.turn.game,
+            nation_id=order.nation_id,
+            action_type=EspionageAction.ActionType.SUPPRESS_FOREIGN_OPERATIONS,
+            status=EspionageAction.Status.ACTIVE,
+        ).count()
+
+        if active_suppress >= max_suppress:
+            errors.append(
+                f"No available suppress slots "
+                f"({active_suppress}/{max_suppress} used)"
+            )
+            return errors
+
+        # Suppress requires a target province (own province)
+        if action_type == "suppress_foreign_operations":
+            target_province_id = payload.get("target_province_id")
+            if not target_province_id:
+                errors.append("Missing target_province_id for suppress_foreign_operations")
+                return errors
+            try:
+                target_prov = Province.objects.get(pk=target_province_id)
+                if target_prov.nation_id != order.nation_id:
+                    errors.append("Suppress target must be own province")
+            except Province.DoesNotExist:
+                errors.append("Target province not found")
+
+    return errors
+
+
+def _validate_persuade_to_join(order, action_def):
+    """Validate persuade_to_join espionage action.
+    Payload: {"action_type": "persuade_to_join", "target_province_id": int}
+
+    Checks:
+      - FIA policy >= PERSUADE_MIN_FIA_LEVEL (2)
+      - foreign_intel_hq building exists
+      - target province exists in this game and is unclaimed
+      - location requirements pass for acting nation
+    """
+    from nations.models import NationPolicy
+    from provinces.models import Province, Building
+    from economy.normalization import check_location_requirements
+    from economy.integration_constants import PERSUADE_MIN_FIA_LEVEL
 
     errors = []
     payload = order.payload
 
-    action_type = payload.get("action_type")
-    target_nation_id = payload.get("target_nation_id")
+    # FIA level check
+    min_fia = action_def.get("min_fia_level", PERSUADE_MIN_FIA_LEVEL)
+    try:
+        fia_policy = NationPolicy.objects.get(
+            nation_id=order.nation_id, category="foreign_intelligence_agency"
+        )
+        fia_level = fia_policy.level
+    except NationPolicy.DoesNotExist:
+        fia_level = 0
 
-    if not action_type:
-        errors.append("Missing action_type")
+    if fia_level < min_fia:
+        errors.append(
+            f"Requires foreign_intelligence_agency at level {min_fia} or higher "
+            f"(currently {fia_level})"
+        )
         return errors
 
-    if action_type not in ESPIONAGE_ACTION_DEFS:
-        errors.append(f"Unknown action type: {action_type}")
+    # HQ building
+    hq = Building.objects.filter(
+        province__nation_id=order.nation_id,
+        building_type="foreign_intel_hq",
+        is_active=True,
+        under_construction=False,
+    ).first()
+    if not hq:
+        errors.append("No active Foreign Intelligence Agency HQ building")
         return errors
 
-    if not target_nation_id:
-        errors.append("Missing target_nation_id")
+    # Target province
+    target_province_id = payload.get("target_province_id")
+    if not target_province_id:
+        errors.append("Missing target_province_id for persuade_to_join")
         return errors
 
-    if not Nation.objects.filter(pk=target_nation_id, game=order.nation.game).exists():
-        errors.append("Target nation not found in this game")
+    try:
+        province = Province.objects.get(pk=target_province_id, game=order.turn.game)
+    except Province.DoesNotExist:
+        errors.append("Target province not found in this game")
         return errors
 
-    if target_nation_id == order.nation_id:
-        errors.append("Cannot target your own nation")
+    if province.nation_id is not None:
+        errors.append("Target province is already owned — persuade_to_join requires an unclaimed province")
+        return errors
+
+    if not check_location_requirements(province, order.nation):
+        errors.append(
+            "Location requirements not met: province must border at least 2 national "
+            "provinces, or 1 national province with shared sea/river access, or be "
+            "within naval reach of a national port"
+        )
 
     return errors
 
 
 def _validate_specialize_branch_office(order):
-    """Validate specialize branch office order.
-    Payload: {"building_id": int, "action_type": str}
+    """Validate branch office specialization order.
+    Payload: {"province_id": int, "action_type": str}
     """
-    from espionage.constants import ESPIONAGE_ACTION_DEFS
-    from provinces.models import Building
-
     errors = []
     payload = order.payload
 
-    building_id = payload.get("building_id")
+    from espionage.constants import FOREIGN_ACTION_TYPES
+    from espionage.models import BranchOfficeSpecialization
+    from provinces.models import Province, Building
+
+    province_id = payload.get("province_id")
     action_type = payload.get("action_type")
 
-    if not building_id:
-        errors.append("Missing building_id")
-        return errors
-    if not action_type:
-        errors.append("Missing action_type")
+    if not province_id:
+        errors.append("Missing province_id")
         return errors
 
-    if action_type not in ESPIONAGE_ACTION_DEFS:
-        errors.append(f"Unknown action type: {action_type}")
+    if action_type not in FOREIGN_ACTION_TYPES:
+        errors.append(f"Invalid action_type: {action_type}. Must be one of: {FOREIGN_ACTION_TYPES}")
         return errors
 
-    if not Building.objects.filter(
-        pk=building_id,
-        province__nation_id=order.nation_id,
+    try:
+        province = Province.objects.get(pk=province_id)
+    except Province.DoesNotExist:
+        errors.append("Province not found")
+        return errors
+
+    if province.nation_id != order.nation_id:
+        errors.append("Province does not belong to this nation")
+        return errors
+
+    # Check for completed branch_office in this province
+    building = Building.objects.filter(
+        province=province,
         building_type="branch_office",
-    ).exists():
-        errors.append("Branch office not found or does not belong to this nation")
+        is_active=True,
+        under_construction=False,
+    ).first()
+
+    if not building:
+        errors.append("No completed branch_office building in this province")
+        return errors
+
+    # Check not already specialized
+    if BranchOfficeSpecialization.objects.filter(building=building).exists():
+        errors.append("This branch office is already specialized")
 
     return errors
 
@@ -706,5 +972,84 @@ def _validate_research_unlock(order):
         errors.append(
             f"Insufficient research: need {cost}, have {pool.research:.0f}"
         )
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Province acquisition validator
+# ---------------------------------------------------------------------------
+
+def _validate_acquire_province(order):
+    """Validate province acquisition order.
+    Payload: {"province_id": int, "method": "economic"|"military"|"diplomatic"|"conquest"}
+
+    Only "economic" is fully implemented. Others return stub errors.
+    """
+    from provinces.models import Province
+    from economy.models import NationResourcePool
+    from economy.integration_constants import ECONOMIC_ACQUISITION_COSTS
+    from economy.normalization import check_location_requirements
+
+    errors = []
+    payload = order.payload
+
+    province_id = payload.get("province_id")
+    method = payload.get("method")
+
+    if not province_id:
+        errors.append("Missing province_id")
+        return errors
+    if not method:
+        errors.append("Missing method")
+        return errors
+
+    valid_methods = ("economic", "military", "diplomatic", "conquest")
+    if method not in valid_methods:
+        errors.append(f"Invalid method: {method}. Must be one of: {valid_methods}")
+        return errors
+
+    if method == "military":
+        errors.append("Military acquisition not yet implemented")
+        return errors
+    if method == "diplomatic":
+        errors.append("Diplomatic acquisition not yet implemented")
+        return errors
+    if method == "conquest":
+        errors.append("Conquest not yet implemented")
+        return errors
+
+    # Economic acquisition
+    try:
+        province = Province.objects.get(pk=province_id, game=order.turn.game)
+    except Province.DoesNotExist:
+        errors.append("Province not found in this game")
+        return errors
+
+    if province.nation_id is not None:
+        errors.append("Province is already owned — economic acquisition requires an unclaimed province")
+        return errors
+
+    nation = order.nation
+    if not check_location_requirements(province, nation):
+        errors.append(
+            "Location requirements not met: province must border at least 2 national "
+            "provinces, or 1 national province with shared sea/river access, or be "
+            "within naval reach of a national port"
+        )
+        return errors
+
+    try:
+        pool = NationResourcePool.objects.get(nation_id=order.nation_id)
+    except NationResourcePool.DoesNotExist:
+        errors.append("Nation resource pool not found")
+        return errors
+
+    for resource, cost in ECONOMIC_ACQUISITION_COSTS.items():
+        pool_val = getattr(pool, resource, 0) or 0
+        if pool_val < cost:
+            errors.append(
+                f"Insufficient {resource}: need {cost}, have {pool_val:.0f}"
+            )
 
     return errors

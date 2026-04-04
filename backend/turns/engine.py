@@ -50,9 +50,14 @@ class TurnResolutionEngine:
             self._execute_build_orders(turn)
             self._execute_trades(turn)
             self._execute_military_orders(turn)
+            self._execute_espionage_orders(turn)
+            self._execute_acquisition_orders(turn)
 
             # Step 4: Run economy simulation
             self._run_economy_simulation(turn)
+
+            # Step 4b: Run espionage simulation (after economy)
+            self._run_espionage_simulation(turn)
 
             # Step 5: Check collapse conditions
             self._check_collapse_conditions(turn)
@@ -573,6 +578,161 @@ class TurnResolutionEngine:
                 f"(cost {cost} research)"
             )
 
+    def _execute_espionage_orders(self, turn):
+        """Execute espionage orders: branch office specializations and espionage actions."""
+        from espionage.models import BranchOfficeSpecialization, EspionageAction
+        from espionage.constants import ESPIONAGE_ACTION_DEFS
+        from provinces.models import Building
+
+        # 1. Process SPECIALIZE_BRANCH_OFFICE orders
+        spec_orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.SPECIALIZE_BRANCH_OFFICE,
+            status=Order.Status.VALIDATED,
+        )
+        for order in spec_orders:
+            try:
+                payload = order.payload
+                building = Building.objects.get(
+                    province_id=payload["province_id"],
+                    building_type="branch_office",
+                    province__nation=order.nation,
+                )
+                BranchOfficeSpecialization.objects.create(
+                    building=building,
+                    action_type=payload["action_type"],
+                )
+                order.status = Order.Status.EXECUTED
+                order.save(update_fields=["status"])
+                self._log(
+                    f"{order.nation.name} specialized branch office in province "
+                    f"{payload['province_id']} for {payload['action_type']}"
+                )
+            except Exception as exc:
+                order.status = Order.Status.FAILED
+                order.validation_errors = [str(exc)]
+                order.save(update_fields=["status", "validation_errors"])
+                self._log(f"Specialize branch office order {order.id} failed: {exc}")
+
+        # 2. Process ESPIONAGE_ACTION orders
+        action_orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.ESPIONAGE_ACTION,
+            status=Order.Status.VALIDATED,
+        )
+        for order in action_orders:
+            try:
+                payload = order.payload
+                action_type = payload["action_type"]
+                action_def = ESPIONAGE_ACTION_DEFS[action_type]
+                duration = action_def["duration"]
+
+                expires_turn = (
+                    turn.turn_number + duration if duration is not None else None
+                )
+
+                EspionageAction.objects.create(
+                    game=self.game,
+                    nation=order.nation,
+                    action_type=action_type,
+                    target_nation_id=payload.get("target_nation_id"),
+                    target_province_id=payload.get("target_province_id"),
+                    target_building_type=payload.get("target_building_type", ""),
+                    payload=payload,
+                    status=EspionageAction.Status.ACTIVE,
+                    started_turn=turn.turn_number,
+                    expires_turn=expires_turn,
+                )
+                order.status = Order.Status.EXECUTED
+                order.save(update_fields=["status"])
+                self._log(
+                    f"{order.nation.name} launched espionage action: {action_type}"
+                )
+            except Exception as exc:
+                order.status = Order.Status.FAILED
+                order.validation_errors = [str(exc)]
+                order.save(update_fields=["status", "validation_errors"])
+                self._log(f"Espionage action order {order.id} failed: {exc}")
+
+    def _execute_acquisition_orders(self, turn):
+        """Execute province acquisition orders.
+
+        Payload: {"province_id": int, "method": "economic"|...}
+        Only "economic" is fully implemented. Others are stubs validated out.
+        """
+        from economy.models import NationResourcePool
+        from economy.integration_constants import ECONOMIC_ACQUISITION_COSTS
+        from economy.normalization import start_normalization
+        from provinces.models import Province
+
+        orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.ACQUIRE_PROVINCE,
+            status=Order.Status.VALIDATED,
+        )
+        for order in orders:
+            try:
+                payload = order.payload
+                province = Province.objects.get(
+                    pk=payload["province_id"], game=self.game
+                )
+                nation = order.nation
+
+                # Re-validate the province is still unclaimed (race condition guard)
+                if province.nation_id is not None:
+                    order.status = Order.Status.FAILED
+                    order.validation_errors = ["Province was claimed by another nation"]
+                    order.save(update_fields=["status", "validation_errors"])
+                    self._log(
+                        f"Acquisition order {order.id} failed: province {province.id} "
+                        f"already claimed"
+                    )
+                    continue
+
+                # Deduct resources
+                pool = NationResourcePool.objects.get(nation=nation)
+                for resource, cost in ECONOMIC_ACQUISITION_COSTS.items():
+                    current = getattr(pool, resource, 0) or 0
+                    setattr(pool, resource, round(current - cost, 2))
+                pool.save(update_fields=list(ECONOMIC_ACQUISITION_COSTS.keys()))
+
+                # Reconquest: skip normalization if this was our province
+                if province.original_nation_id == nation.id:
+                    province.nation = nation
+                    province.is_core = True
+                    province.ideology_traits = nation.ideology_traits or {}
+                    province.normalization_started_turn = None
+                    province.normalization_duration = None
+                    province.save(update_fields=[
+                        "nation", "is_core", "ideology_traits",
+                        "normalization_started_turn", "normalization_duration",
+                    ])
+                    order.status = Order.Status.EXECUTED
+                    order.save(update_fields=["status"])
+                    self._log(
+                        f"{nation.name} reconquered province {province.id} "
+                        f"(no normalization)"
+                    )
+                else:
+                    start_normalization(province, nation, turn.turn_number)
+                    province.save(update_fields=[
+                        "nation", "is_core", "ideology_traits",
+                        "normalization_started_turn", "normalization_duration",
+                        "original_nation",
+                    ])
+                    order.status = Order.Status.EXECUTED
+                    order.save(update_fields=["status"])
+                    self._log(
+                        f"{nation.name} acquired province {province.id} economically "
+                        f"(normalization: {province.normalization_duration} turns)"
+                    )
+
+            except Exception as exc:
+                order.status = Order.Status.FAILED
+                order.validation_errors = [str(exc)]
+                order.save(update_fields=["status", "validation_errors"])
+                self._log(f"Acquisition order {order.id} failed: {exc}")
+
     def _run_economy_simulation(self, turn):
         """Run the economy simulation engine."""
         from economy.simulation import simulate_economy_for_game
@@ -580,6 +740,14 @@ class TurnResolutionEngine:
         self._log("Running economy simulation...")
         simulate_economy_for_game(self.game, turn.turn_number)
         self._log("Economy simulation complete")
+
+    def _run_espionage_simulation(self, turn):
+        """Run the espionage simulation after economy."""
+        from espionage.simulation import simulate_espionage
+
+        self._log("Running espionage simulation...")
+        simulate_espionage(self.game, turn.turn_number)
+        self._log("Espionage simulation complete")
 
     def _check_collapse_conditions(self, turn):
         """Check if any nations have collapsed."""

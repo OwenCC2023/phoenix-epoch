@@ -14,4 +14,5 @@ urlpatterns = [
     path("api/games/<int:game_id>/", include("economy.urls")),
     path("api/games/<int:game_id>/turns/", include("turns.urls")),
     path("api/games/<int:game_id>/", include("events.urls")),
+    path("api/games/<int:game_id>/espionage/", include("espionage.urls")),
 ]

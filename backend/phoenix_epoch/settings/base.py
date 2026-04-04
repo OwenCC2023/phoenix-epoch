@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "economy",
     "turns",
     "events",
+    "espionage",
 ]
 
 MIDDLEWARE = [

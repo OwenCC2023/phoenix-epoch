@@ -45,6 +45,7 @@ class Order(models.Model):
         ESPIONAGE_ACTION = "espionage_action"
         SPECIALIZE_BRANCH_OFFICE = "specialize_branch_office"
         RESEARCH_UNLOCK = "research_unlock"
+        ACQUIRE_PROVINCE = "acquire_province"
 
     class Status(models.TextChoices):
         DRAFT = "draft"

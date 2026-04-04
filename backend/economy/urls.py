@@ -24,6 +24,11 @@ urlpatterns = [
         name="resource-ledger-list",
     ),
     path(
+        "nations/<int:nation_id>/research/",
+        views.NationResearchView.as_view(),
+        name="nation-research",
+    ),
+    path(
         "trades/",
         views.TradeOfferListCreateView.as_view(),
         name="trade-offer-list-create",

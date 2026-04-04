@@ -83,6 +83,7 @@ class Province(models.Model):
     local_stability = models.FloatField(default=70.0)  # 0-100
     local_security = models.FloatField(default=30.0)   # 0-100
     local_happiness = models.FloatField(default=50.0)  # 0-100
+    literacy = models.FloatField(default=0.20)         # 0.0-1.0, fraction of literate population
     designation = models.CharField(max_length=20, choices=DESIGNATION_CHOICES, default="rural")
     is_capital = models.BooleanField(default=False)
     is_coastal = models.BooleanField(default=False)   # can build Naval Base

@@ -18,6 +18,9 @@ def validate_order(order):
         "create_group": _validate_create_group,
         "rename_group": _validate_rename_group,
         "assign_formation_to_group": _validate_assign_formation_to_group,
+        "espionage_action": _validate_espionage_action,
+        "specialize_branch_office": _validate_specialize_branch_office,
+        "research_unlock": _validate_research_unlock,
     }
 
     validator = validators.get(order.order_type)
@@ -559,5 +562,149 @@ def _validate_assign_formation_to_group(order):
     if group_id is not None:
         if not MilitaryGroup.objects.filter(pk=group_id, nation_id=order.nation_id).exists():
             errors.append("Group not found or does not belong to this nation")
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Espionage order validators
+# ---------------------------------------------------------------------------
+
+def _validate_espionage_action(order):
+    """Validate espionage action order.
+    Payload: {"action_type": str, "target_nation_id": int, "target_province_id": int (optional)}
+    """
+    from espionage.constants import ESPIONAGE_ACTION_DEFS
+    from nations.models import Nation
+
+    errors = []
+    payload = order.payload
+
+    action_type = payload.get("action_type")
+    target_nation_id = payload.get("target_nation_id")
+
+    if not action_type:
+        errors.append("Missing action_type")
+        return errors
+
+    if action_type not in ESPIONAGE_ACTION_DEFS:
+        errors.append(f"Unknown action type: {action_type}")
+        return errors
+
+    if not target_nation_id:
+        errors.append("Missing target_nation_id")
+        return errors
+
+    if not Nation.objects.filter(pk=target_nation_id, game=order.nation.game).exists():
+        errors.append("Target nation not found in this game")
+        return errors
+
+    if target_nation_id == order.nation_id:
+        errors.append("Cannot target your own nation")
+
+    return errors
+
+
+def _validate_specialize_branch_office(order):
+    """Validate specialize branch office order.
+    Payload: {"building_id": int, "action_type": str}
+    """
+    from espionage.constants import ESPIONAGE_ACTION_DEFS
+    from provinces.models import Building
+
+    errors = []
+    payload = order.payload
+
+    building_id = payload.get("building_id")
+    action_type = payload.get("action_type")
+
+    if not building_id:
+        errors.append("Missing building_id")
+        return errors
+    if not action_type:
+        errors.append("Missing action_type")
+        return errors
+
+    if action_type not in ESPIONAGE_ACTION_DEFS:
+        errors.append(f"Unknown action type: {action_type}")
+        return errors
+
+    if not Building.objects.filter(
+        pk=building_id,
+        province__nation_id=order.nation_id,
+        building_type="branch_office",
+    ).exists():
+        errors.append("Branch office not found or does not belong to this nation")
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Research unlock validator
+# ---------------------------------------------------------------------------
+
+def _validate_research_unlock(order):
+    """Validate research unlock order.
+    Payload: {"sector": str, "tier": int}
+
+    Checks:
+      - sector is a known building category
+      - tier is 1 or 2
+      - current unlock tier for this sector is tier-1 (sequential)
+      - nation has sufficient research in pool
+    """
+    from economy.models import NationResourcePool, ResearchUnlock
+    from economy.research_constants import RESEARCH_UNLOCK_COSTS
+
+    errors = []
+    payload = order.payload
+
+    sector = payload.get("sector")
+    tier = payload.get("tier")
+
+    if not sector:
+        errors.append("Missing sector")
+        return errors
+    if tier is None:
+        errors.append("Missing tier")
+        return errors
+    if not isinstance(tier, int) or tier not in (1, 2):
+        errors.append("tier must be 1 or 2")
+        return errors
+    if sector not in RESEARCH_UNLOCK_COSTS:
+        errors.append(f"Unknown or non-unlockable sector: {sector}")
+        return errors
+
+    # Sequential check: tier 2 requires tier 1 to already be unlocked.
+    existing_tier = 0
+    try:
+        existing = ResearchUnlock.objects.get(nation_id=order.nation_id, sector=sector)
+        existing_tier = existing.tier
+    except ResearchUnlock.DoesNotExist:
+        pass
+
+    if tier != existing_tier + 1:
+        if tier <= existing_tier:
+            errors.append(f"Sector '{sector}' is already unlocked at tier {existing_tier}")
+        else:
+            errors.append(f"Must unlock tier {existing_tier + 1} before tier {tier}")
+        return errors
+
+    # Cost check
+    cost = RESEARCH_UNLOCK_COSTS[sector].get(tier)
+    if cost is None:
+        errors.append(f"No unlock cost defined for sector '{sector}' tier {tier}")
+        return errors
+
+    try:
+        pool = NationResourcePool.objects.get(nation_id=order.nation_id)
+    except NationResourcePool.DoesNotExist:
+        errors.append("Nation resource pool not found")
+        return errors
+
+    if pool.research < cost:
+        errors.append(
+            f"Insufficient research: need {cost}, have {pool.research:.0f}"
+        )
 
     return errors

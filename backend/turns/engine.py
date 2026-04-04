@@ -45,6 +45,7 @@ class TurnResolutionEngine:
 
             # Step 3: Execute orders in priority order
             self._execute_policy_changes(turn)
+            self._execute_research_unlocks(turn)
             self._execute_allocations(turn)
             self._execute_build_orders(turn)
             self._execute_trades(turn)
@@ -532,6 +533,45 @@ class TurnResolutionEngine:
         self._log(
             f"{order.nation.name} assigned formation '{formation.name}' to group '{group_name}'"
         )
+
+    def _execute_research_unlocks(self, turn):
+        """Execute research unlock orders.
+
+        Payload: {"sector": str, "tier": int}
+        Deducts research from pool and creates/updates a ResearchUnlock row.
+        Runs after policy changes so unlocked levels are available for build
+        orders this same turn.
+        """
+        from economy.models import NationResourcePool, ResearchUnlock
+        from economy.research_constants import RESEARCH_UNLOCK_COSTS
+
+        orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.RESEARCH_UNLOCK,
+            status=Order.Status.VALIDATED,
+        )
+        for order in orders:
+            payload = order.payload
+            sector = payload["sector"]
+            tier = int(payload["tier"])
+            cost = RESEARCH_UNLOCK_COSTS[sector][tier]
+
+            pool = NationResourcePool.objects.get(nation=order.nation)
+            pool.research = round(pool.research - cost, 2)
+            pool.save(update_fields=["research"])
+
+            ResearchUnlock.objects.update_or_create(
+                nation=order.nation,
+                sector=sector,
+                defaults={"tier": tier, "unlocked_turn": turn.turn_number},
+            )
+
+            order.status = Order.Status.EXECUTED
+            order.save(update_fields=["status"])
+            self._log(
+                f"{order.nation.name} unlocked '{sector}' tier {tier} "
+                f"(cost {cost} research)"
+            )
 
     def _run_economy_simulation(self, turn):
         """Run the economy simulation engine."""

@@ -42,6 +42,9 @@ class Order(models.Model):
         CREATE_GROUP = "create_group"
         RENAME_GROUP = "rename_group"
         ASSIGN_FORMATION_TO_GROUP = "assign_formation_to_group"
+        ESPIONAGE_ACTION = "espionage_action"
+        SPECIALIZE_BRANCH_OFFICE = "specialize_branch_office"
+        RESEARCH_UNLOCK = "research_unlock"
 
     class Status(models.TextChoices):
         DRAFT = "draft"

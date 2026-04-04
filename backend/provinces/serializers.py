@@ -91,6 +91,7 @@ class ProvinceSerializer(serializers.ModelSerializer):
             "local_stability",
             "local_security",
             "local_happiness",
+            "literacy",
             "designation",
             "is_capital",
             "is_coastal",

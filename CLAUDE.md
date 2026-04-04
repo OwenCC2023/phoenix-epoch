@@ -154,7 +154,7 @@ Construction cost (all three, L1/L2/L3): ~5000 materials + 4000–16000 wealth; 
 
 **`security_multiplier`** is the one non-additive trait effect — merged multiplicatively, not additively. Honorable: 1.8/1.4 (strong/weak); Devious: 0.8/0.9. Handled by `_MULTIPLICATIVE_EFFECT_KEYS` in `trait_constants.py`.
 
-**Stub effects (awaiting future systems):** trade_capacity, diplomatic_reputation, espionage, bureaucratic_capacity, literacy, military_organisation, etc.
+**Stub effects (awaiting future systems):** trade_capacity, diplomatic_reputation, espionage, bureaucratic_capacity, military_organisation, etc. (`literacy` trait stub is now wired via System 11.)
 
 ### 1e. Policies system
 
@@ -674,9 +674,6 @@ A plains + mountain + coast starting nation:
 
 ## Future systems (planned but not built)
 
-### Research / technology tree
-Research is produced today (urban_ruins, technocratic ideology) but accumulates unused. Intended to unlock building upgrades, government transitions, or national bonuses. Design not yet settled.
-
 ### Military system
 **A full design plan exists at `C:\Users\miloc\.claude\plans\military-system.md` — read it before implementing any part of this system.**
 
@@ -702,7 +699,7 @@ The `capital` designation is a stub. Once built, government buildings in the cap
 `GameEvent` model and `events/helpers.py` exist. GM-created events can apply national modifiers. Not yet integrated into turn resolution loop.
 
 ### Province control / conquest
-No combat system yet. Provinces can be reassigned via admin, but there is no player-facing conquest mechanic.
+**Economic acquisition and espionage persuasion (System 12) are implemented.** Military conquest, diplomatic acquisition, and the full combat system are not yet built. Provinces can be reassigned via admin for testing.
 
 ### Construction cost/time reduction (wiring stub)
 `construction_cost_reduction` (national) and `construction_time_reduction` (province) effects are computed by buildings but not yet applied in the build API. `get_construction_modifiers(nation)` in `building_simulation.py` aggregates cost reduction and is ready to call from the construction view.
@@ -725,7 +722,7 @@ No combat system yet. Provinces can be reassigned via admin, but there is no pla
 - `trade_capacity` — diplomatic/internal trade bonuses
 - `diplomatic_reputation` — reputation modifiers
 - `espionage` — espionage effectiveness
-- `literacy` — general literacy bonus
+- `literacy` — **now wired** via System 11: `get_literacy_research_multiplier()` and happiness amplifier
 - `military_organisation` — military structural efficiency
 
 **Policy/Unit gates:**

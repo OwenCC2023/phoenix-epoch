@@ -13,6 +13,7 @@ class NationResourcePool(models.Model):
     research = models.FloatField(default=0)
     stability = models.FloatField(default=50.0)
     happiness = models.FloatField(default=50.0)
+    literacy = models.FloatField(default=0.20)  # national average literacy (0.0-1.0)
     total_population = models.PositiveIntegerField(default=0)
     consecutive_food_deficit_turns = models.PositiveIntegerField(default=0)
 
@@ -77,6 +78,21 @@ class NationGoodStock(models.Model):
 
     def __str__(self):
         return f"Good stocks for {self.nation}"
+
+
+class ResearchUnlock(models.Model):
+    """Tracks which building sectors a nation has unlocked to higher tiers via research spending."""
+
+    nation = models.ForeignKey("nations.Nation", on_delete=models.CASCADE, related_name="research_unlocks")
+    sector = models.CharField(max_length=50)           # building category key from BUILDING_TYPES
+    tier = models.PositiveIntegerField(default=1)      # 1 = L3-L4 unlocked, 2 = L5-L6 unlocked
+    unlocked_turn = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ("nation", "sector")
+
+    def __str__(self):
+        return f"{self.nation} — {self.sector} tier {self.tier}"
 
 
 class TradeOffer(models.Model):

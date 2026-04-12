@@ -243,6 +243,21 @@ class BuildingView(APIView):
         else:
             target_level = 1
 
+        # Research unlock gating: levels above BASE_MAX_BUILDING_LEVEL require a research unlock.
+        from economy.literacy import get_max_building_level
+        sector = b_def.get("category", "")
+        max_level = get_max_building_level(province.nation, sector)
+        if target_level > max_level:
+            return Response(
+                {
+                    "detail": (
+                        f"Building level {target_level} requires a research unlock for the "
+                        f"'{sector}' sector. Spend research to unlock higher building tiers."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         from provinces.building_constants import get_level_data
         level_data = get_level_data(building_type, target_level)
         cost = level_data["construction_cost"]

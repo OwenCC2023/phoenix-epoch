@@ -48,6 +48,7 @@ class EspionageAction(models.Model):
         PROMOTE_FOREIGN_IDEOLOGY = "promote_foreign_ideology"
         TERRORIST_ATTACK = "terrorist_attack"
         SABOTAGE_BUILDING = "sabotage_building"
+        PERSUADE_TO_JOIN = "persuade_to_join"
         # Domestic actions
         SUPPRESS_FOREIGN_OPERATIONS = "suppress_foreign_operations"
 

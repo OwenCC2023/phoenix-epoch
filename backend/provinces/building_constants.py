@@ -631,7 +631,7 @@ BUILDING_TYPES = {
         "base_outputs": {},
         "base_construction_cost": {"materials": 600, "wealth": 400},
         "base_construction_turns": 4,
-        "base_effects": {"integration_bonus": 0.05, "land_trade_capacity": 50},
+        "base_effects": {"integration_bonus": 0.05, "land_trade_capacity": 50, "literacy_bonus": 0.02},
     },
     "bank": {
         "label": "Bank",
@@ -929,7 +929,7 @@ BUILDING_TYPES = {
         "base_outputs": {},
         "base_construction_cost": {"materials": 600, "wealth": 400},
         "base_construction_turns": 6,
-        "base_effects": {"literacy_bonus": 0.10, "research_bonus": 0.08, "bureaucratic_capacity": 8},
+        "base_effects": {"literacy_bonus": 0.06, "research_bonus": 0.08, "bureaucratic_capacity": 8},
     },
     "holy_site": {
         "label": "Holy Site",

@@ -124,3 +124,79 @@ def apply_sabotage_building(action, province, transparency, turn_number):
         f"Sabotage: disabled {target_building_type} in province {province.id} "
         f"for {disable_turns} turns (transparency={transparency:.2f})"
     )
+
+
+def apply_persuade_to_join(action, turn_number):
+    """Apply the completion effect of a persuade_to_join action.
+
+    Called when the action reaches its expires_turn. Assigns the target
+    unclaimed province to the acting nation and begins normalization.
+
+    If the province has already been claimed by the time the action
+    completes, the action fails gracefully.
+    """
+    from economy.normalization import check_location_requirements, start_normalization
+
+    province = action.target_province
+    nation = action.nation
+
+    if province is None:
+        action.result["failed"] = "no_target_province"
+        action.save(update_fields=["result"])
+        logger.warning(f"persuade_to_join action {action.id}: no target province")
+        return
+
+    if province.nation_id is not None:
+        # Province was claimed by someone else while the action was running.
+        action.result["failed"] = "province_already_claimed"
+        action.result["claimed_by"] = province.nation_id
+        action.save(update_fields=["result"])
+        logger.info(
+            f"persuade_to_join: province {province.id} already claimed by "
+            f"nation {province.nation_id}, action {action.id} failed"
+        )
+        return
+
+    # Re-check location requirements in case geography changed.
+    if not check_location_requirements(province, nation):
+        action.result["failed"] = "location_requirements_no_longer_met"
+        action.save(update_fields=["result"])
+        logger.info(
+            f"persuade_to_join: province {province.id} no longer meets location "
+            f"requirements for nation {nation.id}"
+        )
+        return
+
+    # Reconquest: if this nation is the province's original nation, skip normalization.
+    if province.original_nation_id == nation.id:
+        province.nation = nation
+        province.is_core = True
+        province.ideology_traits = nation.ideology_traits or {}
+        province.normalization_started_turn = None
+        province.normalization_duration = None
+        province.save(update_fields=[
+            "nation", "is_core", "ideology_traits",
+            "normalization_started_turn", "normalization_duration",
+        ])
+        action.result["success"] = True
+        action.result["reconquest"] = True
+        action.save(update_fields=["result"])
+        logger.info(
+            f"persuade_to_join: province {province.id} reconquered by nation {nation.id} "
+            f"(no normalization needed)"
+        )
+        return
+
+    start_normalization(province, nation, turn_number)
+    province.save(update_fields=[
+        "nation", "is_core", "ideology_traits",
+        "normalization_started_turn", "normalization_duration",
+        "original_nation",
+    ])
+    action.result["success"] = True
+    action.result["normalization_duration"] = province.normalization_duration
+    action.save(update_fields=["result"])
+    logger.info(
+        f"persuade_to_join: province {province.id} joined nation {nation.id} "
+        f"(normalization: {province.normalization_duration} turns)"
+    )

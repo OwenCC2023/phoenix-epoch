@@ -25,9 +25,10 @@ from .happiness_constants import (
     HAPPINESS_STABILITY_RECOVERY_MULTIPLIER_BASE,
 )
 from .happiness_policy_data import HAPPINESS_POLICY_MATRIX
+from .literacy_constants import LITERACY_HAPPINESS_AMPLIFIER
 
 
-def compute_province_happiness(province, nation, trait_effects, active_policies):
+def compute_province_happiness(province, nation, trait_effects, active_policies, literacy=0.0):
     """
     Compute province happiness (0-100) as a full static recompute.
 
@@ -41,6 +42,9 @@ def compute_province_happiness(province, nation, trait_effects, active_policies)
         Merged trait effects from get_nation_trait_effects(nation).
     active_policies : dict
         {category_key: level_index} for all active NationPolicy rows.
+    literacy : float
+        Province literacy (0.0–1.0). Higher literacy amplifies the trait-policy
+        alignment delta — good alignment becomes better, bad becomes worse.
 
     Returns
     -------
@@ -70,7 +74,13 @@ def compute_province_happiness(province, nation, trait_effects, active_policies)
     # --- Province building bonus (stub — no buildings declare this yet) ---
     # Future: bldg_effects.get("happiness_generation_bonus", 0.0)
 
-    happiness = BASE_HAPPINESS + trait_baselines + raw * HAPPINESS_POLICY_SCALE
+    # --- Literacy amplification ---
+    # Higher literacy amplifies the alignment delta from BASE_HAPPINESS.
+    # At 0% literacy: amplifier = 1.0 (no change).
+    # At 100% literacy: amplifier = 1.5 (deltas 50% stronger).
+    raw_delta = trait_baselines + raw * HAPPINESS_POLICY_SCALE
+    amplifier = 1.0 + literacy * LITERACY_HAPPINESS_AMPLIFIER
+    happiness = BASE_HAPPINESS + raw_delta * amplifier
     return max(0.0, min(100.0, happiness))
 
 

@@ -45,11 +45,13 @@ class TurnResolutionEngine:
 
             # Step 3: Execute orders in priority order
             self._execute_policy_changes(turn)
+            self._execute_research_unlocks(turn)
             self._execute_allocations(turn)
             self._execute_build_orders(turn)
             self._execute_trades(turn)
             self._execute_military_orders(turn)
             self._execute_espionage_orders(turn)
+            self._execute_acquisition_orders(turn)
 
             # Step 4: Run economy simulation
             self._run_economy_simulation(turn)
@@ -537,6 +539,45 @@ class TurnResolutionEngine:
             f"{order.nation.name} assigned formation '{formation.name}' to group '{group_name}'"
         )
 
+    def _execute_research_unlocks(self, turn):
+        """Execute research unlock orders.
+
+        Payload: {"sector": str, "tier": int}
+        Deducts research from pool and creates/updates a ResearchUnlock row.
+        Runs after policy changes so unlocked levels are available for build
+        orders this same turn.
+        """
+        from economy.models import NationResourcePool, ResearchUnlock
+        from economy.research_constants import RESEARCH_UNLOCK_COSTS
+
+        orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.RESEARCH_UNLOCK,
+            status=Order.Status.VALIDATED,
+        )
+        for order in orders:
+            payload = order.payload
+            sector = payload["sector"]
+            tier = int(payload["tier"])
+            cost = RESEARCH_UNLOCK_COSTS[sector][tier]
+
+            pool = NationResourcePool.objects.get(nation=order.nation)
+            pool.research = round(pool.research - cost, 2)
+            pool.save(update_fields=["research"])
+
+            ResearchUnlock.objects.update_or_create(
+                nation=order.nation,
+                sector=sector,
+                defaults={"tier": tier, "unlocked_turn": turn.turn_number},
+            )
+
+            order.status = Order.Status.EXECUTED
+            order.save(update_fields=["status"])
+            self._log(
+                f"{order.nation.name} unlocked '{sector}' tier {tier} "
+                f"(cost {cost} research)"
+            )
+
     def _execute_espionage_orders(self, turn):
         """Execute espionage orders: branch office specializations and espionage actions."""
         from espionage.models import BranchOfficeSpecialization, EspionageAction
@@ -612,6 +653,85 @@ class TurnResolutionEngine:
                 order.validation_errors = [str(exc)]
                 order.save(update_fields=["status", "validation_errors"])
                 self._log(f"Espionage action order {order.id} failed: {exc}")
+
+    def _execute_acquisition_orders(self, turn):
+        """Execute province acquisition orders.
+
+        Payload: {"province_id": int, "method": "economic"|...}
+        Only "economic" is fully implemented. Others are stubs validated out.
+        """
+        from economy.models import NationResourcePool
+        from economy.integration_constants import ECONOMIC_ACQUISITION_COSTS
+        from economy.normalization import start_normalization
+        from provinces.models import Province
+
+        orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.ACQUIRE_PROVINCE,
+            status=Order.Status.VALIDATED,
+        )
+        for order in orders:
+            try:
+                payload = order.payload
+                province = Province.objects.get(
+                    pk=payload["province_id"], game=self.game
+                )
+                nation = order.nation
+
+                # Re-validate the province is still unclaimed (race condition guard)
+                if province.nation_id is not None:
+                    order.status = Order.Status.FAILED
+                    order.validation_errors = ["Province was claimed by another nation"]
+                    order.save(update_fields=["status", "validation_errors"])
+                    self._log(
+                        f"Acquisition order {order.id} failed: province {province.id} "
+                        f"already claimed"
+                    )
+                    continue
+
+                # Deduct resources
+                pool = NationResourcePool.objects.get(nation=nation)
+                for resource, cost in ECONOMIC_ACQUISITION_COSTS.items():
+                    current = getattr(pool, resource, 0) or 0
+                    setattr(pool, resource, round(current - cost, 2))
+                pool.save(update_fields=list(ECONOMIC_ACQUISITION_COSTS.keys()))
+
+                # Reconquest: skip normalization if this was our province
+                if province.original_nation_id == nation.id:
+                    province.nation = nation
+                    province.is_core = True
+                    province.ideology_traits = nation.ideology_traits or {}
+                    province.normalization_started_turn = None
+                    province.normalization_duration = None
+                    province.save(update_fields=[
+                        "nation", "is_core", "ideology_traits",
+                        "normalization_started_turn", "normalization_duration",
+                    ])
+                    order.status = Order.Status.EXECUTED
+                    order.save(update_fields=["status"])
+                    self._log(
+                        f"{nation.name} reconquered province {province.id} "
+                        f"(no normalization)"
+                    )
+                else:
+                    start_normalization(province, nation, turn.turn_number)
+                    province.save(update_fields=[
+                        "nation", "is_core", "ideology_traits",
+                        "normalization_started_turn", "normalization_duration",
+                        "original_nation",
+                    ])
+                    order.status = Order.Status.EXECUTED
+                    order.save(update_fields=["status"])
+                    self._log(
+                        f"{nation.name} acquired province {province.id} economically "
+                        f"(normalization: {province.normalization_duration} turns)"
+                    )
+
+            except Exception as exc:
+                order.status = Order.Status.FAILED
+                order.validation_errors = [str(exc)]
+                order.save(update_fields=["status", "validation_errors"])
+                self._log(f"Acquisition order {order.id} failed: {exc}")
 
     def _run_economy_simulation(self, turn):
         """Run the economy simulation engine."""

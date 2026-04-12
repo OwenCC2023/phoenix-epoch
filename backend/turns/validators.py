@@ -20,6 +20,8 @@ def validate_order(order):
         "assign_formation_to_group": _validate_assign_formation_to_group,
         "espionage_action": _validate_espionage_action,
         "specialize_branch_office": _validate_specialize_branch_office,
+        "research_unlock": _validate_research_unlock,
+        "acquire_province": _validate_acquire_province,
     }
 
     validator = validators.get(order.order_type)
@@ -595,6 +597,10 @@ def _validate_espionage_action(order):
     action_def = ESPIONAGE_ACTION_DEFS[action_type]
 
     if action_def["type"] == "foreign":
+        # persuade_to_join targets an unclaimed province, not a nation
+        if action_type == "persuade_to_join":
+            return _validate_persuade_to_join(order, action_def)
+
         # --- Foreign action validation ---
         target_nation_id = payload.get("target_nation_id")
         if not target_nation_id:
@@ -776,6 +782,78 @@ def _validate_espionage_action(order):
     return errors
 
 
+def _validate_persuade_to_join(order, action_def):
+    """Validate persuade_to_join espionage action.
+    Payload: {"action_type": "persuade_to_join", "target_province_id": int}
+
+    Checks:
+      - FIA policy >= PERSUADE_MIN_FIA_LEVEL (2)
+      - foreign_intel_hq building exists
+      - target province exists in this game and is unclaimed
+      - location requirements pass for acting nation
+    """
+    from nations.models import NationPolicy
+    from provinces.models import Province, Building
+    from economy.normalization import check_location_requirements
+    from economy.integration_constants import PERSUADE_MIN_FIA_LEVEL
+
+    errors = []
+    payload = order.payload
+
+    # FIA level check
+    min_fia = action_def.get("min_fia_level", PERSUADE_MIN_FIA_LEVEL)
+    try:
+        fia_policy = NationPolicy.objects.get(
+            nation_id=order.nation_id, category="foreign_intelligence_agency"
+        )
+        fia_level = fia_policy.level
+    except NationPolicy.DoesNotExist:
+        fia_level = 0
+
+    if fia_level < min_fia:
+        errors.append(
+            f"Requires foreign_intelligence_agency at level {min_fia} or higher "
+            f"(currently {fia_level})"
+        )
+        return errors
+
+    # HQ building
+    hq = Building.objects.filter(
+        province__nation_id=order.nation_id,
+        building_type="foreign_intel_hq",
+        is_active=True,
+        under_construction=False,
+    ).first()
+    if not hq:
+        errors.append("No active Foreign Intelligence Agency HQ building")
+        return errors
+
+    # Target province
+    target_province_id = payload.get("target_province_id")
+    if not target_province_id:
+        errors.append("Missing target_province_id for persuade_to_join")
+        return errors
+
+    try:
+        province = Province.objects.get(pk=target_province_id, game=order.turn.game)
+    except Province.DoesNotExist:
+        errors.append("Target province not found in this game")
+        return errors
+
+    if province.nation_id is not None:
+        errors.append("Target province is already owned — persuade_to_join requires an unclaimed province")
+        return errors
+
+    if not check_location_requirements(province, order.nation):
+        errors.append(
+            "Location requirements not met: province must border at least 2 national "
+            "provinces, or 1 national province with shared sea/river access, or be "
+            "within naval reach of a national port"
+        )
+
+    return errors
+
+
 def _validate_specialize_branch_office(order):
     """Validate branch office specialization order.
     Payload: {"province_id": int, "action_type": str}
@@ -823,5 +901,155 @@ def _validate_specialize_branch_office(order):
     # Check not already specialized
     if BranchOfficeSpecialization.objects.filter(building=building).exists():
         errors.append("This branch office is already specialized")
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Research unlock validator
+# ---------------------------------------------------------------------------
+
+def _validate_research_unlock(order):
+    """Validate research unlock order.
+    Payload: {"sector": str, "tier": int}
+
+    Checks:
+      - sector is a known building category
+      - tier is 1 or 2
+      - current unlock tier for this sector is tier-1 (sequential)
+      - nation has sufficient research in pool
+    """
+    from economy.models import NationResourcePool, ResearchUnlock
+    from economy.research_constants import RESEARCH_UNLOCK_COSTS
+
+    errors = []
+    payload = order.payload
+
+    sector = payload.get("sector")
+    tier = payload.get("tier")
+
+    if not sector:
+        errors.append("Missing sector")
+        return errors
+    if tier is None:
+        errors.append("Missing tier")
+        return errors
+    if not isinstance(tier, int) or tier not in (1, 2):
+        errors.append("tier must be 1 or 2")
+        return errors
+    if sector not in RESEARCH_UNLOCK_COSTS:
+        errors.append(f"Unknown or non-unlockable sector: {sector}")
+        return errors
+
+    # Sequential check: tier 2 requires tier 1 to already be unlocked.
+    existing_tier = 0
+    try:
+        existing = ResearchUnlock.objects.get(nation_id=order.nation_id, sector=sector)
+        existing_tier = existing.tier
+    except ResearchUnlock.DoesNotExist:
+        pass
+
+    if tier != existing_tier + 1:
+        if tier <= existing_tier:
+            errors.append(f"Sector '{sector}' is already unlocked at tier {existing_tier}")
+        else:
+            errors.append(f"Must unlock tier {existing_tier + 1} before tier {tier}")
+        return errors
+
+    # Cost check
+    cost = RESEARCH_UNLOCK_COSTS[sector].get(tier)
+    if cost is None:
+        errors.append(f"No unlock cost defined for sector '{sector}' tier {tier}")
+        return errors
+
+    try:
+        pool = NationResourcePool.objects.get(nation_id=order.nation_id)
+    except NationResourcePool.DoesNotExist:
+        errors.append("Nation resource pool not found")
+        return errors
+
+    if pool.research < cost:
+        errors.append(
+            f"Insufficient research: need {cost}, have {pool.research:.0f}"
+        )
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Province acquisition validator
+# ---------------------------------------------------------------------------
+
+def _validate_acquire_province(order):
+    """Validate province acquisition order.
+    Payload: {"province_id": int, "method": "economic"|"military"|"diplomatic"|"conquest"}
+
+    Only "economic" is fully implemented. Others return stub errors.
+    """
+    from provinces.models import Province
+    from economy.models import NationResourcePool
+    from economy.integration_constants import ECONOMIC_ACQUISITION_COSTS
+    from economy.normalization import check_location_requirements
+
+    errors = []
+    payload = order.payload
+
+    province_id = payload.get("province_id")
+    method = payload.get("method")
+
+    if not province_id:
+        errors.append("Missing province_id")
+        return errors
+    if not method:
+        errors.append("Missing method")
+        return errors
+
+    valid_methods = ("economic", "military", "diplomatic", "conquest")
+    if method not in valid_methods:
+        errors.append(f"Invalid method: {method}. Must be one of: {valid_methods}")
+        return errors
+
+    if method == "military":
+        errors.append("Military acquisition not yet implemented")
+        return errors
+    if method == "diplomatic":
+        errors.append("Diplomatic acquisition not yet implemented")
+        return errors
+    if method == "conquest":
+        errors.append("Conquest not yet implemented")
+        return errors
+
+    # Economic acquisition
+    try:
+        province = Province.objects.get(pk=province_id, game=order.turn.game)
+    except Province.DoesNotExist:
+        errors.append("Province not found in this game")
+        return errors
+
+    if province.nation_id is not None:
+        errors.append("Province is already owned — economic acquisition requires an unclaimed province")
+        return errors
+
+    nation = order.nation
+    if not check_location_requirements(province, nation):
+        errors.append(
+            "Location requirements not met: province must border at least 2 national "
+            "provinces, or 1 national province with shared sea/river access, or be "
+            "within naval reach of a national port"
+        )
+        return errors
+
+    try:
+        pool = NationResourcePool.objects.get(nation_id=order.nation_id)
+    except NationResourcePool.DoesNotExist:
+        errors.append("Nation resource pool not found")
+        return errors
+
+    for resource, cost in ECONOMIC_ACQUISITION_COSTS.items():
+        pool_val = getattr(pool, resource, 0) or 0
+        if pool_val < cost:
+            errors.append(
+                f"Insufficient {resource}: need {cost}, have {pool_val:.0f}"
+            )
 
     return errors

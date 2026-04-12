@@ -207,7 +207,8 @@ def simulate_espionage(game, turn_number):
     # --- Step 3: Apply active action effects ---
     _apply_action_effects(game, turn_number, nation_data)
 
-    # --- Step 4: Expire/complete actions ---
+    # --- Step 4: Apply persuade_to_join completion effects, then expire all others ---
+    _complete_persuade_actions(game, turn_number)
     _expire_actions(game, turn_number)
 
     # --- Step 5: Re-enable sabotaged buildings ---
@@ -269,13 +270,34 @@ def _apply_action_effects(game, turn_number, nation_data):
                 apply_sabotage_building(action, action.target_province, t, turn_number)
 
 
+def _complete_persuade_actions(game, turn_number):
+    """Apply completion effects for persuade_to_join actions that have reached expiry.
+
+    Must run BEFORE _expire_actions so the actions are still ACTIVE when we
+    apply their effects. After applying, marks each action as COMPLETED.
+    """
+    from .action_effects import apply_persuade_to_join
+
+    completing = EspionageAction.objects.filter(
+        game=game,
+        action_type=EspionageAction.ActionType.PERSUADE_TO_JOIN,
+        status=EspionageAction.Status.ACTIVE,
+        expires_turn__lte=turn_number,
+    ).select_related("target_province", "nation")
+
+    for action in completing:
+        apply_persuade_to_join(action, turn_number)
+        action.status = EspionageAction.Status.COMPLETED
+        action.save(update_fields=["status", "result"])
+
+
 def _expire_actions(game, turn_number):
-    """Mark actions past their expiry turn as completed."""
+    """Mark non-persuade actions past their expiry turn as completed."""
     expired = EspionageAction.objects.filter(
         game=game,
         status=EspionageAction.Status.ACTIVE,
         expires_turn__lte=turn_number,
-    )
+    ).exclude(action_type=EspionageAction.ActionType.PERSUADE_TO_JOIN)
     count = expired.update(status=EspionageAction.Status.COMPLETED)
     if count:
         logger.info(f"Expired {count} espionage actions in game {game.id}")

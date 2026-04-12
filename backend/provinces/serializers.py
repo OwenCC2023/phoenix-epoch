@@ -78,6 +78,27 @@ class ProvinceSerializer(serializers.ModelSerializer):
     adjacent_river_zone_ids = serializers.PrimaryKeyRelatedField(
         source="adjacent_river_zones", many=True, read_only=True
     )
+    normalization_progress = serializers.SerializerMethodField()
+
+    def get_normalization_progress(self, province):
+        if province.is_core or province.normalization_started_turn is None:
+            return 1.0
+        from economy.normalization import compute_normalization_progress
+        # We don't have current_turn in context; approximate from stored fields.
+        # The simulation updates these fields each turn, so we compute from
+        # normalization_started_turn and normalization_duration alone.
+        # Return None if the context doesn't have turn info.
+        request = self.context.get("request")
+        if request:
+            game_id = request.parser_context.get("kwargs", {}).get("game_id")
+            if game_id:
+                from games.models import Game
+                try:
+                    game = Game.objects.get(pk=game_id)
+                    return round(compute_normalization_progress(province, game.current_turn_number), 3)
+                except Game.DoesNotExist:
+                    pass
+        return None
 
     class Meta:
         model = Province
@@ -91,10 +112,17 @@ class ProvinceSerializer(serializers.ModelSerializer):
             "local_stability",
             "local_security",
             "local_happiness",
+            "literacy",
             "designation",
             "is_capital",
             "is_coastal",
             "is_river",
+            "ideology_traits",
+            "is_core",
+            "normalization_started_turn",
+            "normalization_duration",
+            "original_nation",
+            "normalization_progress",
             "center_x",
             "center_y",
             "sea_border_distance",

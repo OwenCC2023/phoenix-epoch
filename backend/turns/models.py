@@ -44,6 +44,8 @@ class Order(models.Model):
         ASSIGN_FORMATION_TO_GROUP = "assign_formation_to_group"
         ESPIONAGE_ACTION = "espionage_action"
         SPECIALIZE_BRANCH_OFFICE = "specialize_branch_office"
+        RESEARCH_UNLOCK = "research_unlock"
+        ACQUIRE_PROVINCE = "acquire_province"
 
     class Status(models.TextChoices):
         DRAFT = "draft"

@@ -83,6 +83,7 @@ class Province(models.Model):
     local_stability = models.FloatField(default=70.0)  # 0-100
     local_security = models.FloatField(default=30.0)   # 0-100
     local_happiness = models.FloatField(default=50.0)  # 0-100
+    literacy = models.FloatField(default=0.20)         # 0.0-1.0, fraction of literate population
     designation = models.CharField(max_length=20, choices=DESIGNATION_CHOICES, default="rural")
     is_capital = models.BooleanField(default=False)
     is_coastal = models.BooleanField(default=False)   # can build Naval Base
@@ -110,6 +111,33 @@ class Province(models.Model):
     adjacent_river_zones = models.ManyToManyField(
         RiverZone, blank=True, related_name="adjacent_provinces", db_table="provinces_province_riverzone"
     )
+
+    # ---------------------------------------------------------------------------
+    # Provincial Integration System
+    # ---------------------------------------------------------------------------
+
+    # Province-level ideology traits. Core provinces mirror the national ideology.
+    # Non-core provinces start with their own traits and normalize over time.
+    # Format: {"strong": "trait_key", "weak": ["trait1", "trait2"]}
+    ideology_traits = models.JSONField(default=dict, blank=True)
+
+    # The nation that originally owned this province (for reconquest mechanics).
+    original_nation = models.ForeignKey(
+        "nations.Nation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="original_provinces",
+    )
+
+    # Core provinces behave identically to the rest of the nation.
+    # Non-core provinces apply stability/happiness penalties during normalization.
+    is_core = models.BooleanField(default=True)
+
+    # Normalization tracks when a non-core province started integrating and
+    # how long the full normalization period lasts (in turns).
+    normalization_started_turn = models.PositiveIntegerField(null=True, blank=True)
+    normalization_duration = models.PositiveIntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

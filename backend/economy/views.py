@@ -6,7 +6,7 @@ from games.models import Game
 from nations.models import Nation
 
 from .construction import get_nation_under_construction
-from .models import NationGoodStock, NationResourcePool, ResourceLedger, TradeOffer
+from .models import NationGoodStock, NationResourcePool, ResearchUnlock, ResourceLedger, TradeOffer
 from .serializers import (
     ConstructionBuildingSerializer,
     NationGoodStockSerializer,
@@ -152,6 +152,93 @@ class TradeOfferListCreateView(generics.ListCreateAPIView):
             TradeOfferSerializer(trade, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class NationResearchView(APIView):
+    """
+    GET /api/games/{game_id}/nations/{nation_id}/research/
+
+    Returns:
+      - current research pool amount
+      - national literacy (from pool)
+      - list of unlocked sectors with their current tier
+      - list of available next unlocks with costs
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, game_id, nation_id):
+        from .research_constants import RESEARCH_UNLOCK_COSTS
+
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        pool, _ = NationResourcePool.objects.get_or_create(nation=nation)
+        unlocks = {u.sector: u.tier for u in ResearchUnlock.objects.filter(nation=nation)}
+
+        available_unlocks = []
+        for sector, tier_costs in RESEARCH_UNLOCK_COSTS.items():
+            current_tier = unlocks.get(sector, 0)
+            next_tier = current_tier + 1
+            if next_tier in tier_costs:
+                available_unlocks.append({
+                    "sector": sector,
+                    "current_tier": current_tier,
+                    "next_tier": next_tier,
+                    "cost": tier_costs[next_tier],
+                    "can_afford": pool.research >= tier_costs[next_tier],
+                })
+
+        return Response({
+            "research": pool.research,
+            "national_literacy": pool.literacy,
+            "unlocked_sectors": [
+                {"sector": s, "tier": t} for s, t in sorted(unlocks.items())
+            ],
+            "available_unlocks": available_unlocks,
+        })
+
+
+class NationAcquirableProvincesView(APIView):
+    """
+    GET /api/games/{game_id}/nations/{nation_id}/acquirable/
+
+    Returns unclaimed provinces in this game that pass location requirements
+    for the given nation, along with the economic acquisition cost.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, game_id, nation_id):
+        from provinces.models import Province
+        from economy.normalization import check_location_requirements
+        from economy.integration_constants import ECONOMIC_ACQUISITION_COSTS
+
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        unclaimed = Province.objects.filter(
+            game_id=game_id,
+            nation__isnull=True,
+        ).prefetch_related("adjacent_provinces", "adjacent_sea_zones", "adjacent_river_zones")
+
+        acquirable = []
+        for province in unclaimed:
+            if check_location_requirements(province, nation):
+                acquirable.append({
+                    "province_id": province.id,
+                    "name": province.name,
+                    "terrain_type": province.terrain_type,
+                    "population": province.population,
+                    "ideology_traits": province.ideology_traits,
+                    "acquisition_cost": ECONOMIC_ACQUISITION_COSTS,
+                })
+
+        return Response({"acquirable_provinces": acquirable})
 
 
 class TradeOfferResponseView(APIView):

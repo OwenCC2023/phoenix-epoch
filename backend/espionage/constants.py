@@ -133,6 +133,7 @@ FOREIGN_ACTION_TYPES = [
     "promote_foreign_ideology",
     "terrorist_attack",
     "sabotage_building",
+    "persuade_to_join",
 ]
 
 DOMESTIC_ACTION_TYPES = [
@@ -174,5 +175,12 @@ ESPIONAGE_ACTION_DEFS = {
         "defense_bonus": 15,
         "min_dia_level": 1,
         "duration": None,         # persistent until cancelled
+    },
+    "persuade_to_join": {
+        "type": "foreign",
+        "min_fia_level": 2,
+        "duration": 6,            # 6 months to complete
+        # Targets an unclaimed province (target_province required; target_nation must be None)
+        # On completion: province is assigned to acting nation and normalization begins.
     },
 }

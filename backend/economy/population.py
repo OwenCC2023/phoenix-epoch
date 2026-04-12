@@ -36,6 +36,7 @@ is read.  Future keys: "disease", "healthcare", "climate", "war_attrition", ...
 """
 
 from .constants import FOOD_CONSUMPTION_PER_POP
+from .literacy_constants import LITERACY_MIGRATION_SENSITIVITY
 
 # --- Growth curve constants ---------------------------------------------------
 #
@@ -213,7 +214,9 @@ def simulate_migration(provinces, province_growth_rates):
         rate = province_growth_rates.get(province.id, 0.0)
         if rate < 0:
             # Outflow proportional to decline severity; respect population floor.
-            raw_outflow = int(province.population * abs(rate) * MIGRATION_RATE)
+            # Literate pops are more likely to migrate to better conditions.
+            literacy_sensitivity = 1.0 + getattr(province, "literacy", 0.0) * LITERACY_MIGRATION_SENSITIVITY
+            raw_outflow = int(province.population * abs(rate) * MIGRATION_RATE * literacy_sensitivity)
             actual_outflow = min(raw_outflow, province.population - 100)
             if actual_outflow > 0:
                 sending.append((province, actual_outflow))

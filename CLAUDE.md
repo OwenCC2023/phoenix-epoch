@@ -21,6 +21,7 @@ A turn-based, asynchronous multiplayer grand-strategy game set in a **post-apoca
 | `economy` | Resource pools, simulation engine, population growth, migration, construction, building production |
 | `turns` | Turn submission, resolution orchestration (Celery tasks) |
 | `espionage` | Inter-nation espionage: attack/defense computation, transparency revelation, espionage actions |
+| `trade` | Nation-to-nation trade routes, Dijkstra pathfinding, capacity pools, capital relocation |
 | `events` | GM-created game events that apply modifiers |
 
 ### Key files to read before changing economy logic
@@ -57,11 +58,17 @@ espionage/revelation.py          — compute_revealed_info(), transparency categ
 espionage/simulation.py          — simulate_espionage() per-turn loop, called from turns/engine.py after economy
 espionage/action_effects.py      — apply_promote_foreign_ideology(), apply_terrorist_attack(), apply_sabotage_building()
 espionage/slots.py               — slot capacity helpers (foreign targets, action types, suppress)
+trade/constants.py               — TRADE_SPEED_PER_TURN, zone/embark distances, capital relocation costs
+trade/distance.py                — effective_land_distance() with relief/vegetation/temperature multipliers
+trade/pathfinding.py             — build_trade_graph(), find_trade_route_path() (Dijkstra)
+trade/capacity.py                — get_trade_capacity(), validate_route_capacity()
+trade/simulation.py              — process_trade_imports(), process_trade_exports(), recompute_route_paths()
+trade/capital.py                 — validate/initiate/process capital relocation
 ```
 
 ---
 
-## Systems built (as of 2026-04-05)
+## Systems built (as of 2026-04-12)
 
 ### 1. Buildings system
 
@@ -611,6 +618,33 @@ turns/validators.py               — _validate_acquire_province(), _validate_pe
 
 ---
 
+### 13. Trade system
+
+**Full detail:** `docs/systems/trade_system.md`
+
+**What:** Nation-to-nation trade routes move a single good per route between capitals. Pathfinding uses Dijkstra over the province/zone graph with three domain pools (land/sea/air). Goods are in-flight for multiple turns before arriving.
+
+**Key models:** `TradeRoute` (directional, path_nodes JSON, in_flight JSON), `CapitalRelocation` (OneToOne per nation, 12-turn peacetime delay).
+
+**Province environment fields added:** `relief`, `vegetation_level`, `temperature_band` on `Province` — multiply effective land-hop distance.
+
+**Nation field added:** `Nation.capital_province` FK + `get_effective_capital()` (returns None if province captured by enemy).
+
+**Capacity formula:** `base × (1 + trade_pct) × (1 + trade_capacity_bonus + trade_capacity_penalty)` — consumed per route as `(domain_distance / 100) × quantity_per_turn`.
+
+**Turn integration:**
+- `recompute_route_paths(game, turn_number)` runs once per game before per-nation loops (marks BROKEN_PATH / INACTIVE_WAR)
+- Step 8 (import): `process_trade_imports()` delivers arrived in-flight goods
+- Step 16.5 (export): `process_trade_exports()` deducts stock, pushes to in_flight queue
+
+**Order types:** `create_trade_route`, `cancel_trade_route`, `designate_capital`
+
+**API endpoints** under `/api/games/<id>/trade/`: `routes/`, `routes/<id>/`, `preview/`, `capacity/`, `capital-relocation/`
+
+**Migrations:** `economy/0005_remove_tradeoffer`, `nations/0004_add_capital_province`, `provinces/0008_add_trade_province_fields`, `provinces/0009_seed_relief_from_terrain`, `trade/0001_create_traderoute_capitalrelocation`
+
+---
+
 ## Turn cadence
 
 **One turn = one month.** A full game lasts 30+ years = **360+ turns.**
@@ -692,9 +726,6 @@ Summary of what needs to be built:
 ### Bureaucratic capacity
 The `capital` designation is a stub. Once built, government buildings in the capital should provide bureaucratic capacity that enables larger nations (higher integration efficiency, more provinces before administrative penalties, etc.).
 
-### Trade system
-`trade_net` in the `ResourceLedger` is always zeroed. The `TradeOffer` model exists. Trade execution between nations is the next economy feature.
-
 ### Events system
 `GameEvent` model and `events/helpers.py` exist. GM-created events can apply national modifiers. Not yet integrated into turn resolution loop.
 
@@ -719,7 +750,7 @@ The `capital` designation is a stub. Once built, government buildings in the cap
 
 **Trait scope:**
 - `urban_output_bonus` — building output multiplier in urban provinces (stub — not yet wired in `building_simulation.py`)
-- `trade_capacity` — diplomatic/internal trade bonuses
+- `trade_capacity` — diplomatic/internal trade bonuses (note: `trade_pct` and `trade_capacity_bonus/penalty` are wired; this stub covers future diplomatic trade effects)
 - `diplomatic_reputation` — reputation modifiers
 - `espionage` — espionage effectiveness
 - `literacy` — **now wired** via System 11: `get_literacy_research_multiplier()` and happiness amplifier
@@ -769,6 +800,10 @@ from provinces.travel import get_march_time, get_embark_time, get_zone_travel_ti
 from provinces.travel_constants import CROSS_TYPE_REQUIREMENTS, FREE_CROSS_TYPE_TRANSITIONS
 from nations.policy_effects import get_nation_policy_effects, validate_policy_change, get_policy_building_blocks, get_policy_unit_blocks
 from nations.policy_constants import POLICY_EFFECTS, POLICY_REQUIREMENTS, POLICY_BANS, BUILDING_POLICY_REQUIREMENTS, BUILDING_POLICY_BANS, UNIT_POLICY_REQUIREMENTS, UNIT_POLICY_BANS
+from trade.simulation import recompute_route_paths, process_trade_imports, process_trade_exports
+from trade.pathfinding import find_trade_route_path, build_trade_graph
+from trade.capacity import get_trade_capacity, validate_route_capacity
+from trade.capital import validate_capital_relocation, process_capital_relocations
 print('OK')
 "
 ```
@@ -781,10 +816,13 @@ print('OK')
 
 | App | Migrations |
 |-----|-----------|
-| provinces | 0001_initial, 0002_add_province_designation, 0003_capital_designation_and_pop_default, 0004_*(military)*, 0005_zone_adjacency_and_travel, 0006_add_local_security, 0007_add_province_happiness, 0008_add_province_literacy, 0009_provincial_integration |
-| economy | 0001_initial, 0002_add_new_goods_to_nationgoodstock, 0003_add_nation_security, 0004_add_nation_happiness, 0005_add_literacy_and_research_unlock |
-| nations | 0001_initial, 0002_ideology_traits_and_policies |
+| economy | 0001_initial, 0002_add_new_goods_to_nationgoodstock, 0003_add_military_goods, 0004_add_nation_happiness, 0005_add_literacy_and_research_unlock, 0006_remove_tradeoffer |
+| nations | 0001_initial, 0002_ideology_traits_and_policies, 0003_gov_components, 0004_add_capital_province |
+| provinces | 0001–0009 (see below), 0010_add_trade_province_fields, 0011_seed_relief_from_terrain |
 | espionage | 0001_create_espionage_models |
+| trade | 0001_create_traderoute_capitalrelocation |
 | All others | 0001_initial |
+
+Province migrations 0001–0009: `0001_initial`, `0002_add_province_designation`, `0003_capital_designation_and_pop_default`, `0004_add_coastal_river_and_military_models`, `0005_zone_adjacency_and_travel`, `0006_add_local_security`, `0007_add_province_happiness`, `0008_add_province_literacy`, `0009_provincial_integration`
 
 When adding model fields, always run `makemigrations <appname> --name descriptive_name`.

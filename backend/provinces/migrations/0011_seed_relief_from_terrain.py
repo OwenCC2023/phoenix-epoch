@@ -32,7 +32,7 @@ def reverse_seed_relief(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('provinces', '0008_add_trade_province_fields'),
+        ('provinces', '0010_add_trade_province_fields'),
     ]
 
     operations = [

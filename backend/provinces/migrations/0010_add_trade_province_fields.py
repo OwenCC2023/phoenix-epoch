@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('provinces', '0007_add_province_happiness'),
+        ('provinces', '0009_provincial_integration'),
     ]
 
     operations = [

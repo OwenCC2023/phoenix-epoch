@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('games', '0001_initial'),
         ('nations', '0004_add_capital_province'),
-        ('provinces', '0009_seed_relief_from_terrain'),
+        ('provinces', '0011_seed_relief_from_terrain'),
     ]
 
     operations = [

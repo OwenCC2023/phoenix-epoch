@@ -91,6 +91,11 @@ def simulate_economy_for_game(game, turn_number):
     """Run the full economy simulation for all nations in a game."""
     from nations.models import Nation
     from provinces.models import Province
+    from trade.simulation import recompute_route_paths
+
+    # Recompute all trade route paths for this game before running per-nation economy.
+    # This ensures capital movements and adjacency changes are reflected in exports.
+    recompute_route_paths(game, turn_number)
 
     nations = Nation.objects.filter(game=game, is_alive=True).prefetch_related(
         "provinces__buildings",
@@ -459,8 +464,16 @@ def simulate_nation_economy(nation, turn_number):
     literacy_research_mult = get_literacy_research_multiplier(national_literacy)
     modified_pool["research"] = round(modified_pool["research"] * literacy_research_mult, 2)
 
-    # Step 8: Trade execution (placeholder)
+    # Step 8: Trade imports — deliver in-flight goods that have arrived this turn.
+    # Imported goods are available for current-turn pool calculations below.
+    from trade.simulation import process_trade_imports
+    from .models import NationGoodStock
+    good_stock_import, _ = NationGoodStock.objects.get_or_create(nation=nation)
+    import_net = process_trade_imports(nation, turn_number, pool, good_stock_import)
     trade_net = empty_resources()
+    for good, amount in import_net.items():
+        if good in trade_net:
+            trade_net[good] = round(trade_net[good] + amount, 4)
 
     # Step 9: Government upkeep
     # upkeep_reduction from buildings (e.g. banks, fuel depots) and traits reduces total upkeep.
@@ -602,6 +615,17 @@ def simulate_nation_economy(nation, turn_number):
 
     # Step 16: Consumer goods consumption (shortage → stability penalty)
     simulate_good_consumption(nation, total_pop_after)
+
+    # Step 16.5: Trade exports — deduct from post-spend stocks and push to in_flight.
+    # Exports use whatever remains after domestic consumption; shortfall is capped
+    # (partial shipment) and does not trigger shortages for the rest of the economy.
+    from trade.simulation import process_trade_exports
+    from .models import NationGoodStock
+    good_stock_export, _ = NationGoodStock.objects.get_or_create(nation=nation)
+    export_net = process_trade_exports(nation, turn_number, pool, good_stock_export)
+    for good, amount in export_net.items():
+        if good in trade_net:
+            trade_net[good] = round(trade_net[good] + amount, 4)  # amount is negative
 
     # Step 17: Military upkeep deduction
     # Returns (manpower_supply_ratio, food_supply_ratio) used in Step 18.

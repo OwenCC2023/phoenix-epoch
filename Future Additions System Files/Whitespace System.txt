@@ -1,0 +1,3 @@
+Whitespace System
+
+Main Goal: Allow provincial changes and ideologies of now-fallen nations to persist after their demise.

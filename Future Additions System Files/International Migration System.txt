@@ -1,0 +1,3 @@
+International Migration System
+
+Main Goal: Simulate the movement of people from places with low prospects to those with greater opportunities. Allow nations to grow by attracting migrants from the unsettled regions around them.

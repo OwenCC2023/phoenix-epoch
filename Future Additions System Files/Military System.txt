@@ -1,0 +1,3 @@
+Military System
+
+Main Goal: Simulate the ability of a nation to build and maintain a military of diverse unit types, capabilities, and quality levels.

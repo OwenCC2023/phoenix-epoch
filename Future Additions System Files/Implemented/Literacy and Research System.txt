@@ -1,0 +1,51 @@
+Literacy and Research System:
+
+Main Goal: Make a system that rewards spending resources on bettering the population over the long-term.
+
+General Principles:
+	- Research accumulates based on total literacy %.
+	- Research is spent to unlock something.
+	- Literacy starts the game low (20%).
+	- Having more schooling increases literacy growth/turn.
+	- Being richer improves literacy growth/turn.
+	- Tracked on a provincial level.
+	- Societies with growth rates faster than literacy growth rates will gain in absolute numbers of literate, but lose total literacy %.
+	- "Literacy Bonus" is a growth/turn modifier.
+
+
+Components:
+	- Literacy Growth operates on an S-curve. Use that principle to calculate how to apply literacy growth/turn.
+	- Research can be used to unlock:
+		- The next level of building on a sector-wide basis.
+		- More advanced military units.
+
+Tie-ins with other systems:
+	- Buildings:
+		- Gates off levels of buildings above level 2 until unlocked by spending research.
+		- Unlocks happen by sector (Heavy Manufacturing, Light Manufacturing, Farming, etc).
+		- Each unlock accesses two more levels.
+	- Policies [name: effects]:
+		- Bureaucracy: Higher Literacy makes meritocratic bureaucratic systems generate more government capacity.
+		- Legal System: Common Law and Civil Code generate more stability in high-literacy societies.
+		- Child Labour: The more child labor is allowed the lower literacy growth/turn is. This should completely negate Mandatory Primary Education at low levels of child labour, and Mandatory Secondary Education at more child labour. This should never turn it negative or reduce it to zero based on these policies alone.
+		- Slavery/Slavery Type: Higher levels are increasingly detrimental to literacy growth/turn. This should never turn it negative or reduce it to zero based on these policies alone. Higher levels of Slavery also place increasingly punishing caps on total literacy %.
+	- Ideologies [name: Effects]:
+		- Spiritualism (Strong/Weak): 1.3x/1.10x the effect of Religious buildings on literacy and research.
+		- Modern (Strong/Weak): 1.3x/1.10x the effect of educational buildings on literacy and research.
+		- Industrialist (Strong/Weak): 1.3x/1.10x the effect of industrial buildings on literacy and research.
+		- Militarist (Strong/Weak): -25%/-10% cost to research military units.
+		- Pacifist (Strong/Weak): +50%/+25% cost to research miliary units.
+	- Stability:
+		- More literate pops will be unhappier in general, which in turn will modify stability.
+	- Security:
+		- Literates value high security, and will be unhappy without it.
+	- Happiness:
+		- Literate pops are unhappier if the government isn't following its Ideology Traits.
+	- Migration:
+		- Literate pops are more likely to migrate.
+	- Military (stub):
+		- "Better" units are gated behind research unlocks. System is still in design phase.
+
+Existing Building Changes:
+	- Madrasa: Reduce Literacy Bonus to 6%.
+	- Trading Post: Add 2% Literacy Bonus.

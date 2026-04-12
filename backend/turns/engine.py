@@ -48,7 +48,6 @@ class TurnResolutionEngine:
             self._execute_research_unlocks(turn)
             self._execute_allocations(turn)
             self._execute_build_orders(turn)
-            self._execute_trades(turn)
             self._execute_military_orders(turn)
             self._execute_espionage_orders(turn)
             self._execute_acquisition_orders(turn)
@@ -269,80 +268,6 @@ class TurnResolutionEngine:
                 imp.level += 1
                 self._log(f"Improvement {imp.improvement_type} completed in {imp.province.name} (now level {imp.level})")
             imp.save()
-
-    def _execute_trades(self, turn):
-        """Execute trade orders (offers and responses)."""
-        from economy.models import TradeOffer, NationResourcePool
-
-        # Process trade responses first
-        responses = Order.objects.filter(
-            turn=turn,
-            order_type=Order.OrderType.TRADE_RESPONSE,
-            status=Order.Status.VALIDATED,
-        )
-        for order in responses:
-            payload = order.payload
-            try:
-                trade = TradeOffer.objects.get(pk=payload["trade_offer_id"])
-            except TradeOffer.DoesNotExist:
-                order.status = Order.Status.FAILED
-                order.validation_errors = ["Trade offer not found"]
-                order.save()
-                continue
-
-            if payload["action"] == "accept":
-                # Transfer resources
-                from_pool = NationResourcePool.objects.get(nation=trade.from_nation)
-                to_pool = NationResourcePool.objects.get(nation=trade.to_nation)
-
-                # Check sender can afford
-                can_afford = True
-                for resource, amount in trade.offering.items():
-                    if getattr(from_pool, resource, 0) < amount:
-                        can_afford = False
-                        break
-
-                if can_afford:
-                    for resource, amount in trade.offering.items():
-                        setattr(from_pool, resource, getattr(from_pool, resource) - amount)
-                        setattr(to_pool, resource, getattr(to_pool, resource) + amount)
-                    for resource, amount in trade.requesting.items():
-                        setattr(to_pool, resource, getattr(to_pool, resource) - amount)
-                        setattr(from_pool, resource, getattr(from_pool, resource) + amount)
-                    from_pool.save()
-                    to_pool.save()
-                    trade.status = TradeOffer.Status.EXECUTED
-                    self._log(f"Trade executed: {trade.from_nation.name} <-> {trade.to_nation.name}")
-                else:
-                    trade.status = TradeOffer.Status.EXPIRED
-                    self._log(f"Trade failed (insufficient resources): {trade.from_nation.name}")
-            else:
-                trade.status = TradeOffer.Status.REJECTED
-                self._log(f"Trade rejected by {trade.to_nation.name}")
-
-            trade.save()
-            order.status = Order.Status.EXECUTED
-            order.save(update_fields=["status"])
-
-        # Create new trade offers
-        offers = Order.objects.filter(
-            turn=turn,
-            order_type=Order.OrderType.TRADE_OFFER,
-            status=Order.Status.VALIDATED,
-        )
-        for order in offers:
-            payload = order.payload
-            TradeOffer.objects.create(
-                game=self.game,
-                from_nation=order.nation,
-                to_nation_id=payload["to_nation_id"],
-                turn_number=turn.turn_number,
-                offering=payload.get("offering", {}),
-                requesting=payload.get("requesting", {}),
-            )
-            order.status = Order.Status.EXECUTED
-            order.save(update_fields=["status"])
-            self._log(f"{order.nation.name} created trade offer")
 
     def _execute_military_orders(self, turn):
         """Execute all military orders: train_unit, create_formation, assign_to_formation,

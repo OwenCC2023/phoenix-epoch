@@ -31,8 +31,6 @@ class Order(models.Model):
 
     class OrderType(models.TextChoices):
         SET_ALLOCATION = "set_allocation"
-        TRADE_OFFER = "trade_offer"
-        TRADE_RESPONSE = "trade_response"
         POLICY_CHANGE = "policy_change"
         BUILD_IMPROVEMENT = "build_improvement"
         TRAIN_UNIT = "train_unit"

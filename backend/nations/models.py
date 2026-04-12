@@ -20,6 +20,18 @@ class Nation(models.Model):
     )
     motto = models.CharField(max_length=200, blank=True)
     is_alive = models.BooleanField(default=True)
+    # The province designated as this nation's administrative capital.
+    # Null until explicitly set (GM or player action). The trade system
+    # requires a capital to compute trade route lengths.
+    # When a capital province is captured by another nation, this FK
+    # still points at it — get_effective_capital() checks ownership.
+    capital_province = models.ForeignKey(
+        "provinces.Province",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="capital_of_nation",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -27,6 +39,19 @@ class Nation(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.game})"
+
+    def get_effective_capital(self):
+        """Return the capital province if still owned by this nation, else None.
+
+        A capital is "lost" when its nation FK no longer points at this nation
+        (i.e. captured by an enemy). This drives trade route inactivation.
+        """
+        cap = self.capital_province
+        if cap is None:
+            return None
+        if cap.nation_id != self.pk:
+            return None
+        return cap
 
 
 class NationPolicy(models.Model):

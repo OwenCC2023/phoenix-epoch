@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import NationGoodStock, NationResourcePool, ResourceLedger, ProvinceLedger, TradeOffer
+from .models import NationGoodStock, NationResourcePool, ResourceLedger, ProvinceLedger
 
 
 @admin.register(NationGoodStock)
@@ -28,9 +28,3 @@ class ProvinceLedgerAdmin(admin.ModelAdmin):
     list_filter = ("turn_number",)
     search_fields = ("province__name",)
 
-
-@admin.register(TradeOffer)
-class TradeOfferAdmin(admin.ModelAdmin):
-    list_display = ("from_nation", "to_nation", "turn_number", "status", "created_at")
-    list_filter = ("status", "turn_number")
-    search_fields = ("from_nation__name", "to_nation__name")

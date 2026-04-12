@@ -44,6 +44,9 @@ class Order(models.Model):
         SPECIALIZE_BRANCH_OFFICE = "specialize_branch_office"
         RESEARCH_UNLOCK = "research_unlock"
         ACQUIRE_PROVINCE = "acquire_province"
+        CREATE_TRADE_ROUTE = "create_trade_route"
+        CANCEL_TRADE_ROUTE = "cancel_trade_route"
+        DESIGNATE_CAPITAL = "designate_capital"
 
     class Status(models.TextChoices):
         DRAFT = "draft"

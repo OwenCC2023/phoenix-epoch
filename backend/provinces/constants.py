@@ -1,5 +1,45 @@
 """Terrain types and their base production multipliers."""
 
+# ---------------------------------------------------------------------------
+# Trade-related province environment constants
+# ---------------------------------------------------------------------------
+
+# Relief axis: determines terrain friction for trade distance calculation.
+# Separate from terrain_type (biome) — a forest can be flat or mountainous.
+RELIEF_TYPES = {
+    "flat":        {"label": "Flat",        "trade_mult": 1.00},
+    "hilly":       {"label": "Hilly",       "trade_mult": 1.15},
+    "rugged":      {"label": "Rugged",      "trade_mult": 1.25},
+    "marshy":      {"label": "Marshy",      "trade_mult": 1.35},
+    "mountainous": {"label": "Mountainous", "trade_mult": 1.60},
+}
+
+VEGETATION_LEVELS = {
+    "none":   {"label": "None",   "trade_mult": 0.95},
+    "low":    {"label": "Low",    "trade_mult": 1.00},
+    "medium": {"label": "Medium", "trade_mult": 1.15},
+    "high":   {"label": "High",   "trade_mult": 1.35},
+}
+
+TEMPERATURE_BANDS = {
+    "mild": {"label": "Mild", "trade_mult": 1.00},
+    "hot":  {"label": "Hot",  "trade_mult": 1.10},
+    "cold": {"label": "Cold", "trade_mult": 1.15},
+}
+
+# Mapping from existing biome terrain_type to default relief value.
+# Used only by the data migration to seed Province.relief.
+TERRAIN_TYPE_TO_RELIEF = {
+    "plains":      "flat",
+    "mountains":   "mountainous",
+    "forest":      "rugged",
+    "coast":       "flat",
+    "desert":      "flat",
+    "urban_ruins": "flat",
+    "wasteland":   "rugged",
+    "river_valley": "marshy",
+}
+
 # Each terrain defines multipliers for sector production rates.
 # A multiplier of 1.0 is baseline. Higher = better for that sector.
 TERRAIN_TYPES = {

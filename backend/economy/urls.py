@@ -33,14 +33,4 @@ urlpatterns = [
         views.NationAcquirableProvincesView.as_view(),
         name="nation-acquirable-provinces",
     ),
-    path(
-        "trades/",
-        views.TradeOfferListCreateView.as_view(),
-        name="trade-offer-list-create",
-    ),
-    path(
-        "trades/<int:pk>/respond/",
-        views.TradeOfferResponseView.as_view(),
-        name="trade-offer-respond",
-    ),
 ]

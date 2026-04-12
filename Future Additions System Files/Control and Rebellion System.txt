@@ -1,0 +1,3 @@
+Control and Rebellion System
+
+Main Goal: Allow for levels of central control and complete lack thereof to be modeled within the game.

@@ -31,8 +31,6 @@ class Order(models.Model):
 
     class OrderType(models.TextChoices):
         SET_ALLOCATION = "set_allocation"
-        TRADE_OFFER = "trade_offer"
-        TRADE_RESPONSE = "trade_response"
         POLICY_CHANGE = "policy_change"
         BUILD_IMPROVEMENT = "build_improvement"
         TRAIN_UNIT = "train_unit"
@@ -46,6 +44,9 @@ class Order(models.Model):
         SPECIALIZE_BRANCH_OFFICE = "specialize_branch_office"
         RESEARCH_UNLOCK = "research_unlock"
         ACQUIRE_PROVINCE = "acquire_province"
+        CREATE_TRADE_ROUTE = "create_trade_route"
+        CANCEL_TRADE_ROUTE = "cancel_trade_route"
+        DESIGNATE_CAPITAL = "designate_capital"
 
     class Status(models.TextChoices):
         DRAFT = "draft"

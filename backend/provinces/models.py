@@ -2,7 +2,10 @@ import random
 
 from django.db import models
 
-from .constants import TERRAIN_TYPES, TERRAIN_BASE_POPULATION, DEFAULT_PROVINCE_POPULATION
+from .constants import (
+    TERRAIN_TYPES, TERRAIN_BASE_POPULATION, DEFAULT_PROVINCE_POPULATION,
+    RELIEF_TYPES, VEGETATION_LEVELS, TEMPERATURE_BANDS,
+)
 
 
 class AirZone(models.Model):
@@ -65,6 +68,9 @@ class Province(models.Model):
     """The fundamental economic unit."""
 
     TERRAIN_CHOICES = [(key, val["label"]) for key, val in TERRAIN_TYPES.items()]
+    RELIEF_CHOICES = [(key, val["label"]) for key, val in RELIEF_TYPES.items()]
+    VEGETATION_CHOICES = [(key, val["label"]) for key, val in VEGETATION_LEVELS.items()]
+    TEMPERATURE_CHOICES = [(key, val["label"]) for key, val in TEMPERATURE_BANDS.items()]
 
     DESIGNATION_CHOICES = [
         ("rural", "Rural"),
@@ -79,6 +85,11 @@ class Province(models.Model):
     )
     name = models.CharField(max_length=100)
     terrain_type = models.CharField(max_length=20, choices=TERRAIN_CHOICES)
+    # Trade friction environment (independent of biome terrain_type).
+    # Seeded from terrain_type by data migration 0008; mappers can tune independently.
+    relief = models.CharField(max_length=20, choices=RELIEF_CHOICES, default="flat")
+    vegetation_level = models.CharField(max_length=20, choices=VEGETATION_CHOICES, default="low")
+    temperature_band = models.CharField(max_length=20, choices=TEMPERATURE_CHOICES, default="mild")
     population = models.PositiveIntegerField(default=DEFAULT_PROVINCE_POPULATION)
     local_stability = models.FloatField(default=70.0)  # 0-100
     local_security = models.FloatField(default=30.0)   # 0-100

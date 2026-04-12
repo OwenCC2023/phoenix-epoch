@@ -100,6 +100,16 @@ NATIONAL_EFFECT_KEYS = [
     "espionage_defense",            # national espionage defense from buildings
 ]
 
+# All goods that can be traded between nations.
+# Pool resources (NationResourcePool) + manufactured goods (NationGoodStock).
+VALID_GOODS = frozenset([
+    # Pool resources
+    "food", "materials", "energy", "wealth", "manpower", "research",
+    # Manufactured goods
+    "consumer_goods", "arms", "fuel", "machinery", "chemicals",
+    "medicine", "components", "heavy_equipment", "military_goods",
+])
+
 # Sector classification for all building types.
 # Used by the rationing system to determine input-goods allocation priority.
 #   civilian   - production, extraction, healthcare, entertainment, religious, green energy

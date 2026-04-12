@@ -48,10 +48,10 @@ class TurnResolutionEngine:
             self._execute_research_unlocks(turn)
             self._execute_allocations(turn)
             self._execute_build_orders(turn)
-            self._execute_trades(turn)
             self._execute_military_orders(turn)
             self._execute_espionage_orders(turn)
             self._execute_acquisition_orders(turn)
+            self._execute_trade_orders(turn)
 
             # Step 4: Run economy simulation
             self._run_economy_simulation(turn)
@@ -269,80 +269,6 @@ class TurnResolutionEngine:
                 imp.level += 1
                 self._log(f"Improvement {imp.improvement_type} completed in {imp.province.name} (now level {imp.level})")
             imp.save()
-
-    def _execute_trades(self, turn):
-        """Execute trade orders (offers and responses)."""
-        from economy.models import TradeOffer, NationResourcePool
-
-        # Process trade responses first
-        responses = Order.objects.filter(
-            turn=turn,
-            order_type=Order.OrderType.TRADE_RESPONSE,
-            status=Order.Status.VALIDATED,
-        )
-        for order in responses:
-            payload = order.payload
-            try:
-                trade = TradeOffer.objects.get(pk=payload["trade_offer_id"])
-            except TradeOffer.DoesNotExist:
-                order.status = Order.Status.FAILED
-                order.validation_errors = ["Trade offer not found"]
-                order.save()
-                continue
-
-            if payload["action"] == "accept":
-                # Transfer resources
-                from_pool = NationResourcePool.objects.get(nation=trade.from_nation)
-                to_pool = NationResourcePool.objects.get(nation=trade.to_nation)
-
-                # Check sender can afford
-                can_afford = True
-                for resource, amount in trade.offering.items():
-                    if getattr(from_pool, resource, 0) < amount:
-                        can_afford = False
-                        break
-
-                if can_afford:
-                    for resource, amount in trade.offering.items():
-                        setattr(from_pool, resource, getattr(from_pool, resource) - amount)
-                        setattr(to_pool, resource, getattr(to_pool, resource) + amount)
-                    for resource, amount in trade.requesting.items():
-                        setattr(to_pool, resource, getattr(to_pool, resource) - amount)
-                        setattr(from_pool, resource, getattr(from_pool, resource) + amount)
-                    from_pool.save()
-                    to_pool.save()
-                    trade.status = TradeOffer.Status.EXECUTED
-                    self._log(f"Trade executed: {trade.from_nation.name} <-> {trade.to_nation.name}")
-                else:
-                    trade.status = TradeOffer.Status.EXPIRED
-                    self._log(f"Trade failed (insufficient resources): {trade.from_nation.name}")
-            else:
-                trade.status = TradeOffer.Status.REJECTED
-                self._log(f"Trade rejected by {trade.to_nation.name}")
-
-            trade.save()
-            order.status = Order.Status.EXECUTED
-            order.save(update_fields=["status"])
-
-        # Create new trade offers
-        offers = Order.objects.filter(
-            turn=turn,
-            order_type=Order.OrderType.TRADE_OFFER,
-            status=Order.Status.VALIDATED,
-        )
-        for order in offers:
-            payload = order.payload
-            TradeOffer.objects.create(
-                game=self.game,
-                from_nation=order.nation,
-                to_nation_id=payload["to_nation_id"],
-                turn_number=turn.turn_number,
-                offering=payload.get("offering", {}),
-                requesting=payload.get("requesting", {}),
-            )
-            order.status = Order.Status.EXECUTED
-            order.save(update_fields=["status"])
-            self._log(f"{order.nation.name} created trade offer")
 
     def _execute_military_orders(self, turn):
         """Execute all military orders: train_unit, create_formation, assign_to_formation,
@@ -732,6 +658,110 @@ class TurnResolutionEngine:
                 order.validation_errors = [str(exc)]
                 order.save(update_fields=["status", "validation_errors"])
                 self._log(f"Acquisition order {order.id} failed: {exc}")
+
+    def _execute_trade_orders(self, turn):
+        """Execute trade route creation, cancellation, and capital designation orders."""
+        from trade.models import TradeRoute
+        from trade.capital import initiate_capital_relocation, process_capital_relocations
+        from trade.pathfinding import find_trade_route_path
+        from economy.models import NationResourcePool
+        from nations.models import Nation
+        import math
+
+        trade_order_types = [
+            Order.OrderType.CREATE_TRADE_ROUTE,
+            Order.OrderType.CANCEL_TRADE_ROUTE,
+            Order.OrderType.DESIGNATE_CAPITAL,
+        ]
+        orders = Order.objects.filter(
+            turn=turn,
+            order_type__in=trade_order_types,
+            status=Order.Status.VALIDATED,
+        ).select_related("nation")
+
+        for order in orders:
+            try:
+                if order.order_type == Order.OrderType.CREATE_TRADE_ROUTE:
+                    self._exec_create_trade_route(order, turn)
+                elif order.order_type == Order.OrderType.CANCEL_TRADE_ROUTE:
+                    self._exec_cancel_trade_route(order)
+                elif order.order_type == Order.OrderType.DESIGNATE_CAPITAL:
+                    self._exec_designate_capital(order, turn)
+                order.status = Order.Status.EXECUTED
+                order.save(update_fields=["status"])
+            except Exception as exc:
+                order.status = Order.Status.FAILED
+                order.validation_errors = [str(exc)]
+                order.save(update_fields=["status", "validation_errors"])
+                self._log(f"Trade order {order.id} ({order.order_type}) failed: {exc}")
+
+        # Complete any pending capital relocations that mature this turn
+        process_capital_relocations(self.game, turn.turn_number)
+
+    def _exec_create_trade_route(self, order, turn):
+        from trade.models import TradeRoute
+        from trade.pathfinding import find_trade_route_path
+        from nations.models import Nation
+        import math
+
+        payload = order.payload
+        nation = order.nation
+        to_nation = Nation.objects.get(pk=payload["to_nation_id"])
+        good = payload["good"]
+        quantity = payload["quantity_per_turn"]
+        domain_mode = payload.get("domain_mode", "multi")
+
+        from_cap = nation.get_effective_capital()
+        to_cap = to_nation.get_effective_capital()
+
+        result = find_trade_route_path(
+            nation.game_id, from_cap.pk, to_cap.pk, domain_mode
+        )
+
+        from trade.constants import TRADE_SPEED_PER_TURN, MIN_ARRIVAL_TURNS
+        arrival_turns = max(MIN_ARRIVAL_TURNS, math.ceil(result.total_length / TRADE_SPEED_PER_TURN))
+
+        route = TradeRoute.objects.create(
+            game=self.game,
+            from_nation=nation,
+            to_nation=to_nation,
+            good=good,
+            quantity_per_turn=quantity,
+            domain_mode=domain_mode,
+            status=TradeRoute.Status.PENDING,
+            path_nodes=[[n[0], n[1]] for n in result.path],
+            total_length=result.total_length,
+            capacity_by_domain=result.domain_segments,
+            arrival_turns=arrival_turns,
+            in_flight=[],
+            created_turn=turn.turn_number,
+        )
+        self._log(
+            f"{nation.name} created trade route → {to_nation.name}: "
+            f"{quantity}× {good} ({domain_mode}, {arrival_turns} turns transit)"
+        )
+        return route
+
+    def _exec_cancel_trade_route(self, order):
+        from trade.models import TradeRoute
+
+        route = TradeRoute.objects.get(pk=order.payload["route_id"])
+        route.status = TradeRoute.Status.INACTIVE_WAR  # reuse "broken" status to flag manual cancel
+        route.delete()
+        self._log(f"{order.nation.name} cancelled trade route {order.payload['route_id']}")
+
+    def _exec_designate_capital(self, order, turn):
+        from provinces.models import Province
+        from economy.models import NationResourcePool
+        from trade.capital import initiate_capital_relocation
+
+        province = Province.objects.get(pk=order.payload["province_id"])
+        pool = NationResourcePool.objects.get(nation=order.nation)
+        relocation = initiate_capital_relocation(order.nation, province, pool, turn.turn_number)
+        self._log(
+            f"{order.nation.name} initiated capital relocation to {province.name} "
+            f"(completes turn {relocation.completes_turn})"
+        )
 
     def _run_economy_simulation(self, turn):
         """Run the economy simulation engine."""

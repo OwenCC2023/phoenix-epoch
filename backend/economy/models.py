@@ -93,26 +93,3 @@ class ResearchUnlock(models.Model):
 
     def __str__(self):
         return f"{self.nation} — {self.sector} tier {self.tier}"
-
-
-class TradeOffer(models.Model):
-    """Nation-to-nation trade offer."""
-
-    class Status(models.TextChoices):
-        PENDING = "pending"
-        ACCEPTED = "accepted"
-        REJECTED = "rejected"
-        EXPIRED = "expired"
-        EXECUTED = "executed"
-
-    game = models.ForeignKey("games.Game", on_delete=models.CASCADE, related_name="trade_offers")
-    from_nation = models.ForeignKey("nations.Nation", on_delete=models.CASCADE, related_name="outgoing_trades")
-    to_nation = models.ForeignKey("nations.Nation", on_delete=models.CASCADE, related_name="incoming_trades")
-    turn_number = models.PositiveIntegerField()
-    offering = models.JSONField(default=dict)  # {"food": 100, "materials": 50}
-    requesting = models.JSONField(default=dict)  # {"wealth": 200}
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Trade: {self.from_nation} → {self.to_nation} (Turn {self.turn_number})"

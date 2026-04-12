@@ -1,0 +1,52 @@
+Expansion and Provincial Integration System:
+
+Main Goal: Unclaimed provinces can be added to controlled area. Provinces which join the nation from Expansion or Conquest over the course of the game should not behave like core provinces, or those added through the other method.
+
+General Principles:
+	- Provinces can be brought into the nation after the start of the game.
+	- Provinces gain after start can be ungoverned or governed.
+	- Provinces that join will be out of alignment with the rest of the nation. Their ideology traits will be wrong, ungoverned ones will lack much development, and their literacy will be low.	
+	- Provinces joining must be near existing provinces.
+
+Components:
+	- Ideology needs to be tracked at the province level now. 
+		- Normalization will occur at a static rate over a base 10 years.
+			- 8 if any level of Internationalist
+			- 12 if any level of Nationalist
+		- Province ideology out of alignment with national ideology will decrease stability and happiness.
+	- Mechanisms for getting new provinces:
+		- Price: (All must satisfy location requirements).
+			- Military: One of your formations must enter the province. That province then joins your nation.
+			- Economic: Province that is given a satisfactory amount of resources agrees to join your nation.
+			- Espionage: Local leadership is coerced into joining.
+			- Diplomatic: Lots of trade routes already run through the province. Province is already mostly surrounded by your nation. Other nations are expanding rapidly in the area and your nation is richer on average.
+			- Conquest: Taken by military force from another nation through War.
+		- Location (one of the following is true):
+			- Borders two of your existing provinces.
+			- Borders one province and a river or sea-zone.
+			- Shortest distance between the target province and one of your provinces with a port is equal to [# of Naval Bases] sea-zones or less. Target province must also be adjacent to a sea-zone.
+		- Unless Conquest-based province cannot be part of any other existing nation.
+
+Normalization:
+	- When a non-core province is added to the nation it will probably have different ideology traits.
+		- Conquered provinces keep their ideologies from their origin nation.
+		- Non-conquered provinces get randomly assigned ideologies (that follow ideology-choosing rules).
+	- Ideology will come to align with the new nation over a period of time.
+		- 10 years as base.
+		- Internationalist (Strong/Weak) -4/-2 years.
+		- Nationalist (Strong/Weak) +4/+2 years.
+	- After normalization the province will behave identically to all others within the nation.
+	- Provinces reconquered by their original owner will immediately switch back to their previous ideology.
+	- Provinces which become unclaimed drift at base rate towards random ideologies.
+
+
+Tie-ins with other systems:
+	- Espionage:
+		- Foreign Action: Persuade to join. Targets a province and convinces its leadership to join your nation. Must meet location requirements for addition.
+	- Stability:
+		- Non-Normalized provinces have much lower stability. Decreased stability effect reduced by 1/Normalization-Length per year until Normalized.
+	- Happiness:
+		- Non-Normalized provinces have much lower happiness. Decreased happiness effect reduced by 1/Normalization-Length per year until Normalized.
+	- Literacy:
+		- Starts at baseline if non-conquered.
+		- Keeps stats from when it was part of the other nation if conquered.

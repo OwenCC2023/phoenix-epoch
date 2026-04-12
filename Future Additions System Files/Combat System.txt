@@ -1,0 +1,3 @@
+Combat System
+
+Main Goal: Define how national or sub-national militaries fight.

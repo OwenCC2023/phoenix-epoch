@@ -22,6 +22,9 @@ def validate_order(order):
         "specialize_branch_office": _validate_specialize_branch_office,
         "research_unlock": _validate_research_unlock,
         "acquire_province": _validate_acquire_province,
+        "create_trade_route": _validate_create_trade_route,
+        "cancel_trade_route": _validate_cancel_trade_route,
+        "designate_capital": _validate_designate_capital,
     }
 
     validator = validators.get(order.order_type)
@@ -976,6 +979,97 @@ def _validate_research_unlock(order):
     return errors
 
 
+def _validate_create_trade_route(order):
+    """Validate create_trade_route order.
+
+    Payload:
+        {
+            "to_nation_id": int,
+            "good": str,
+            "quantity_per_turn": int,
+            "domain_mode": "multi" | "land" | "sea" | "air"  (optional, default "multi")
+        }
+    """
+    errors = []
+    payload = order.payload
+
+    to_nation_id = payload.get("to_nation_id")
+    good = payload.get("good")
+    quantity = payload.get("quantity_per_turn")
+    domain_mode = payload.get("domain_mode", "multi")
+
+    if not to_nation_id:
+        errors.append("Missing to_nation_id")
+    if not good:
+        errors.append("Missing good")
+    if quantity is None:
+        errors.append("Missing quantity_per_turn")
+    elif not isinstance(quantity, int) or quantity <= 0:
+        errors.append("quantity_per_turn must be a positive integer")
+    if domain_mode not in ("multi", "land", "sea", "air"):
+        errors.append("domain_mode must be one of: multi, land, sea, air")
+
+    if errors:
+        return errors
+
+    from nations.models import Nation
+    try:
+        to_nation = Nation.objects.get(pk=to_nation_id, game=order.nation.game, is_alive=True)
+    except Nation.DoesNotExist:
+        errors.append("Target nation not found or not alive in this game")
+        return errors
+
+    if to_nation.pk == order.nation.pk:
+        errors.append("Cannot create a trade route with yourself")
+        return errors
+
+    # Validate the good is a known resource or manufactured good
+    from provinces.building_constants import VALID_GOODS
+    if good not in VALID_GOODS:
+        errors.append(f"Unknown good: {good}")
+
+    # Check both nations have capitals (path must exist from capital to capital)
+    from_cap = order.nation.get_effective_capital()
+    to_cap = to_nation.get_effective_capital()
+    if from_cap is None:
+        errors.append("Your nation has no active capital; set one before creating trade routes")
+    if to_cap is None:
+        errors.append("Target nation has no active capital")
+
+    if errors:
+        return errors
+
+    # Capacity check: run pathfinder and validate capacity
+    from trade.pathfinding import find_trade_route_path
+    from trade.capacity import validate_route_capacity
+    from economy.building_simulation import get_national_building_effects
+    from nations.helpers import get_nation_trait_effects
+    from nations.policy_effects import get_nation_policy_effects
+
+    nation = order.nation
+    provinces = list(nation.provinces.prefetch_related("buildings").all())
+    nation_effects = get_national_building_effects(provinces)
+    policy_effects = get_nation_policy_effects(nation)
+    trait_effects = get_nation_trait_effects(nation)
+
+    result = find_trade_route_path(
+        nation.game_id, from_cap.pk, to_cap.pk, domain_mode
+    )
+    if result is None:
+        errors.append(
+            "No trade route path exists between the two capitals with the selected domain mode"
+        )
+        return errors
+
+    capacity_errors = validate_route_capacity(
+        nation, provinces, nation_effects, policy_effects, trait_effects,
+        result.domain_segments, quantity,
+    )
+    errors.extend(capacity_errors)
+
+    return errors
+
+
 # ---------------------------------------------------------------------------
 # Province acquisition validator
 # ---------------------------------------------------------------------------
@@ -1052,4 +1146,63 @@ def _validate_acquire_province(order):
                 f"Insufficient {resource}: need {cost}, have {pool_val:.0f}"
             )
 
+    return errors
+
+
+def _validate_cancel_trade_route(order):
+    """Validate cancel_trade_route order.
+
+    Payload: {"route_id": int}
+    """
+    errors = []
+    payload = order.payload
+
+    route_id = payload.get("route_id")
+    if not route_id:
+        errors.append("Missing route_id")
+        return errors
+
+    from trade.models import TradeRoute
+    try:
+        route = TradeRoute.objects.get(pk=route_id, game=order.nation.game)
+    except TradeRoute.DoesNotExist:
+        errors.append("Trade route not found")
+        return errors
+
+    if route.from_nation_id != order.nation.pk:
+        errors.append("You can only cancel your own outgoing trade routes")
+
+    return errors
+
+
+def _validate_designate_capital(order):
+    """Validate designate_capital order.
+
+    Payload: {"province_id": int}
+    """
+    errors = []
+    payload = order.payload
+
+    province_id = payload.get("province_id")
+    if not province_id:
+        errors.append("Missing province_id")
+        return errors
+
+    from provinces.models import Province
+    from economy.models import NationResourcePool
+    from trade.capital import validate_capital_relocation
+
+    try:
+        province = Province.objects.get(pk=province_id)
+    except Province.DoesNotExist:
+        errors.append("Province not found")
+        return errors
+
+    try:
+        pool = NationResourcePool.objects.get(nation=order.nation)
+    except NationResourcePool.DoesNotExist:
+        errors.append("Nation resource pool not found")
+        return errors
+
+    errors.extend(validate_capital_relocation(order.nation, province, pool))
     return errors

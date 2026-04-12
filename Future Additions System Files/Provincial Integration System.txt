@@ -1,3 +1,0 @@
-Provincial Integration System:
-
-Main Goal: Provinces which join the nation over the course of the game should not behave like core provinces.

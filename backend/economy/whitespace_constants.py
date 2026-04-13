@@ -47,5 +47,5 @@ WHITESPACE_MIGRATION_ENABLED = False
 
 # Set True when the Control and Rebellion System is built.
 # When enabled, provinces with these traits will be checked for rebel spawning.
-REBEL_SPAWNING_ENABLED = False
+REBEL_SPAWNING_ENABLED = True
 REBEL_SPAWN_TRAITS = frozenset({"militarist", "nationalist"})

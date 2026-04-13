@@ -82,6 +82,27 @@ def randomise_starting_population(
     return max(100, round(raw / 100) * 100)
 
 
+class Region(models.Model):
+    """Logical grouping of provinces within a nation for shared control settings.
+
+    Provinces are not required to be geographically contiguous. When a region's
+    control is set, all member provinces inherit that control value.
+    """
+
+    nation = models.ForeignKey(
+        "nations.Nation", on_delete=models.CASCADE, related_name="regions"
+    )
+    name = models.CharField(max_length=100)
+    control = models.FloatField(default=100.0)  # 1.0–100.0 percentage
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("nation", "name")
+
+    def __str__(self):
+        return f"{self.name} ({self.nation.name})"
+
+
 class Province(models.Model):
     """The fundamental economic unit."""
 
@@ -173,6 +194,24 @@ class Province(models.Model):
     # mid-deintegration, requiring both state machines to run independently.
     deintegration_started_turn = models.PositiveIntegerField(null=True, blank=True)
     deintegration_duration = models.PositiveIntegerField(null=True, blank=True)
+
+    # Control System — how tightly the nation governs this province (1–100%).
+    # Effective control uses region.control if province is in a region.
+    control = models.FloatField(default=100.0)
+    region = models.ForeignKey(
+        "provinces.Region",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="provinces",
+    )
+
+    # Rebellion state — set when a rebel formation spawns in this province.
+    # The timer counts down until either the nation suppresses the rebellion
+    # (via combat) or the rebels accomplish their objective.
+    is_rebel_occupied = models.BooleanField(default=False)
+    rebel_timer_start_turn = models.PositiveIntegerField(null=True, blank=True)
+    rebel_timer_duration = models.PositiveIntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

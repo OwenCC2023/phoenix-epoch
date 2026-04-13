@@ -25,7 +25,12 @@ Summary of what needs to be built:
 
 ## Whitespace stubs (System 15)
 - **International Migration** — `WHITESPACE_MIGRATION_ENABLED = False` in `economy/whitespace_constants.py`. When built, whitespace populations will participate in cross-border migration flows. Wire into `_simulate_whitespace_province()` in `economy/whitespace.py`.
-- **Rebel spawning** — `REBEL_SPAWNING_ENABLED = False` in `economy/whitespace_constants.py`. Provinces with `militarist` or `nationalist` strong/weak traits will eventually have a per-turn chance of spawning rebel units. Wire into the Control and Rebellion System when built.
+- **Rebel spawning** — **now wired** (System 16). `REBEL_SPAWNING_ENABLED = True`; provinces with `militarist` or `nationalist` traits spawn ownerless rebel bands at 2% per turn.
+
+## Control & Rebellion stubs (System 16)
+- **Partisan rebels** — `spawn_partisan_rebels()` in `economy/rebellion.py` is a no-op. Requires the Occupation System to track enemy-occupied provinces. Set `PARTISAN_SPAWN_ENABLED = True` in `economy/control_constants.py` when ready.
+- **Combat-based rebel suppression** — `check_rebel_suppression()` is a stub: returns True if any non-rebel formation in the province outstrengths rebels by effective_strength. Replace with actual combat resolution when the Combat System is built.
+- **Region map display** — Regions are tracked in the database but not visually distinguished on the frontend map (awaiting frontend implementation).
 
 ## Construction cost/time reduction (wiring stub)
 `construction_cost_reduction` (national) and `construction_time_reduction` (province) effects are computed by buildings but not yet applied in the build API. `get_construction_modifiers(nation)` in `building_simulation.py` aggregates cost reduction and is ready to call from the construction view.

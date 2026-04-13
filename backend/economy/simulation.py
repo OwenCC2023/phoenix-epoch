@@ -44,6 +44,14 @@ from .normalization import (
     compute_normalization_penalties,
 )
 from .whitespace import simulate_all_whitespace
+from .control import (
+    get_province_control,
+    compute_production_bonus,
+    compute_national_flow_fraction,
+    compute_libertarian_control_bonus,
+    compute_authoritarian_national_penalty,
+    compute_egalitarian_national_bonus,
+)
 
 
 RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
@@ -177,6 +185,14 @@ def simulate_nation_economy(nation, turn_number):
         all_trait_keys.add(ideology_traits["strong"])
     all_trait_keys.update(ideology_traits.get("weak", []))
     has_internationalist = "internationalist" in all_trait_keys
+    # Control-ideology interactions (pre-computed once per nation)
+    _strong_trait = ideology_traits.get("strong")
+    is_libertarian_strong = _strong_trait == "libertarian"
+    is_libertarian = "libertarian" in all_trait_keys
+    is_authoritarian_strong = _strong_trait == "authoritarian"
+    is_authoritarian = "authoritarian" in all_trait_keys
+    is_egalitarian_strong = _strong_trait == "egalitarian"
+    is_egalitarian = "egalitarian" in all_trait_keys
 
     integration_bonus_from_traits = (
         trait_effects.get("integration_bonus", 0.0)
@@ -247,8 +263,9 @@ def simulate_nation_economy(nation, turn_number):
     total_exported = empty_resources()
 
     # Per-province snapshots used by later steps.
-    province_food = {}       # id → (food_produced, food_needed)
-    province_job_status = {} # id → job status dict
+    province_food = {}        # id → (food_produced, food_needed)
+    province_job_status = {}  # id → job status dict
+    province_controls = []    # list of effective control values (for national ideology effects)
 
     # National building effects (upkeep_reduction, construction_cost_reduction)
     national_bldg_effects = get_national_building_effects(provinces)
@@ -270,6 +287,10 @@ def simulate_nation_economy(nation, turn_number):
         #   Compute additive multipliers/bonuses from active buildings.
         # ----------------------------------------------------------------
         bldg_effects = get_province_building_effects(province)
+
+        # Effective control level for this province (used in Steps 3, 5, 6).
+        province_control = get_province_control(province)
+        province_controls.append(province_control)
 
         # ----------------------------------------------------------------
         # Step 3: Subsistence production
@@ -323,6 +344,16 @@ def simulate_nation_economy(nation, turn_number):
             2,
         )
 
+        if province.is_rebel_occupied:
+            # Rebels have seized the province — no production reaches the nation.
+            raw_production = empty_resources()
+        else:
+            # Control production bonus applies to materials, energy, wealth only.
+            prod_bonus = compute_production_bonus(province_control)
+            if prod_bonus > 0:
+                for key in ("materials", "energy", "wealth"):
+                    raw_production[key] = round(raw_production[key] * (1.0 + prod_bonus), 2)
+
         # ----------------------------------------------------------------
         # Step 4: Local consumption (food for population)
         # ----------------------------------------------------------------
@@ -331,17 +362,21 @@ def simulate_nation_economy(nation, turn_number):
         local_consumption["food"] = round(local_food_consumption, 2)
 
         # ----------------------------------------------------------------
-        # Step 5: Province surplus → exported to nation (with integration)
+        # Step 5: Province surplus → exported to nation (with integration and control)
         #   integration_bonus from buildings adds to per-province integration.
+        #   control_flow gates how much of the surplus reaches the national pool.
+        #   Rebel-occupied provinces export nothing (and contribute no deficits).
         # ----------------------------------------------------------------
         province_integration = min(1.0, integration_modifier + bldg_effects.get("integration_bonus", 0.0))
         exported = empty_resources()
-        for key in RESOURCE_KEYS:
-            surplus = raw_production[key] - local_consumption.get(key, 0)
-            if surplus > 0:
-                exported[key] = round(surplus * province_integration, 2)
-            else:
-                exported[key] = round(surplus, 2)  # deficit passes through fully
+        if not province.is_rebel_occupied:
+            control_flow = compute_national_flow_fraction(province_control)
+            for key in RESOURCE_KEYS:
+                surplus = raw_production[key] - local_consumption.get(key, 0)
+                if surplus > 0:
+                    exported[key] = round(surplus * province_integration * control_flow, 2)
+                else:
+                    exported[key] = round(surplus, 2)  # deficit passes through fully
 
         # Store food data for growth calculation (after final pool is known)
         province_food[province.id] = (raw_production["food"], local_consumption["food"])
@@ -352,9 +387,13 @@ def simulate_nation_economy(nation, turn_number):
         #   perpetually penalised when the nation has a healthy stockpile.
         #   stability_recovery_bonus from buildings adds to recovery rate.
         #   Security multiplies the effective recovery (high security = faster recovery).
+        #   Rebel-occupied provinces receive no national food distribution.
         # ----------------------------------------------------------------
-        national_food_share = (pool.food / max(total_pop, 1)) * province.population
-        effective_food = raw_production["food"] + national_food_share
+        if province.is_rebel_occupied:
+            effective_food = 0.0  # rebels cut off national food distribution
+        else:
+            national_food_share = (pool.food / max(total_pop, 1)) * province.population
+            effective_food = raw_production["food"] + national_food_share
         food_ratio = effective_food / max(local_food_consumption, 0.001)
 
         # Step 6a: Province security (computed fresh each turn)
@@ -393,6 +432,14 @@ def simulate_nation_economy(nation, turn_number):
             active_policies=active_policies,
             literacy=province.literacy,
         )
+        # Libertarian control bonus: low control → more happiness and stability recovery.
+        if is_libertarian:
+            lib_stab_bonus, lib_hap_bonus = compute_libertarian_control_bonus(
+                province_control, is_strong=is_libertarian_strong
+            )
+            province.local_happiness = min(100.0, province.local_happiness + lib_hap_bonus)
+        else:
+            lib_stab_bonus = 0.0
         happiness_recovery_mult = get_happiness_stability_recovery_multiplier(province.local_happiness)
 
         # Step 6b-bis: Normalization penalties for non-core provinces.
@@ -410,7 +457,7 @@ def simulate_nation_economy(nation, turn_number):
                 normalization_stability_penalty = norm_stab_pen
 
         effective_recovery = (
-            (STABILITY_RECOVERY_RATE + bldg_effects.get("stability_recovery_bonus", 0.0))
+            (STABILITY_RECOVERY_RATE + bldg_effects.get("stability_recovery_bonus", 0.0) + lib_stab_bonus)
             * security_stability_mult
             * happiness_recovery_mult
         )
@@ -440,6 +487,7 @@ def simulate_nation_economy(nation, turn_number):
         province.save(update_fields=[
             "local_stability", "local_security", "local_happiness", "literacy", "designation",
             "ideology_traits", "is_core", "normalization_started_turn", "normalization_duration",
+            "control", "is_rebel_occupied", "rebel_timer_start_turn", "rebel_timer_duration",
         ])
 
         ProvinceLedger.objects.create(
@@ -514,6 +562,28 @@ def simulate_nation_economy(nation, turn_number):
     avg_stability = sum(p.local_stability for p in provinces) / len(provinces) if provinces else 50
     national_stability = max(0, min(100, avg_stability + stability_modifier - bc_stability_penalty))
     final_pools["stability"] = round(national_stability, 2)
+
+    # Step 11.5: Control-ideology national effects + rebellion tick.
+    # Authoritarian nations suffer happiness penalty from low-control provinces.
+    # Egalitarian nations gain happiness bonus when control is uniform.
+    # Both applied to the national happiness (not per-province).
+    national_happiness = (
+        sum(p.local_happiness for p in provinces) / len(provinces) if provinces else 50.0
+    )
+    if is_authoritarian and province_controls:
+        auth_penalty = compute_authoritarian_national_penalty(
+            province_controls, is_strong=is_authoritarian_strong
+        )
+        national_happiness = max(0.0, national_happiness - auth_penalty)
+    if is_egalitarian and province_controls:
+        egal_bonus = compute_egalitarian_national_bonus(
+            province_controls, is_strong=is_egalitarian_strong
+        )
+        national_happiness = min(100.0, national_happiness + egal_bonus)
+
+    # Run rebellion tick: trigger new rebellions, check suppression, resolve timers.
+    from .rebellion import process_rebellion_tick
+    process_rebellion_tick(provinces, nation, turn_number)
 
     # Step 12: Food deficit collapse tracking
     if final_pools["food"] <= 0:
@@ -600,9 +670,7 @@ def simulate_nation_economy(nation, turn_number):
     for key in RESOURCE_KEYS:
         setattr(pool, key, final_pools[key])
     pool.stability = final_pools.get("stability", 50)
-    pool.happiness = round(
-        sum(p.local_happiness for p in provinces) / len(provinces), 2
-    ) if provinces else 50.0
+    pool.happiness = round(national_happiness, 2)
     pool.literacy = round(national_literacy, 4)
     pool.total_population = total_pop_after
     pool.save()
@@ -651,6 +719,92 @@ def simulate_nation_economy(nation, turn_number):
 
     # Step 18: Formation effective_strength recompute
     _update_formation_strengths(nation, manpower_ratio, food_ratio)
+
+    # Step 18.5: ControlPoolSnapshot — informational record of retained vs. national flow.
+    _persist_control_pool_snapshots(provinces, nation, turn_number, integration_modifier)
+
+
+
+
+def _persist_control_pool_snapshots(provinces, nation, turn_number: int, integration_modifier: float) -> None:
+    """Persist per-turn ControlPoolSnapshot rows for provinces and regions.
+
+    For each province not in a region, creates one snapshot recording what the
+    control level retained locally vs. what flowed to the national government.
+    Provinces in a region are aggregated into a single snapshot per region.
+
+    The snapshot is informational only and does not affect gameplay.
+    """
+    from .models import ControlPoolSnapshot
+    from provinces.models import ProvinceResources
+
+    region_data = {}   # region_id → aggregated totals
+    province_rows = []
+
+    for province in provinces:
+        control = get_province_control(province)
+        flow = compute_national_flow_fraction(control)
+        retain = 1.0 - flow
+
+        # Pull raw production from ProvinceResources (just saved this turn).
+        try:
+            res = ProvinceResources.objects.get(province=province)
+            prov_integration = min(1.0, integration_modifier)
+            # Total = surplus that would flow under full integration + control.
+            # Approximate using manpower as 0 (not a "taxable" resource).
+            tax_total = round((res.wealth or 0.0) * prov_integration, 2)
+            trade_total = round(((res.materials or 0.0) + (res.energy or 0.0)) * prov_integration, 2)
+            bc_total = round((res.research or 0.0) * prov_integration, 2)
+            research_total = bc_total
+        except Exception:
+            tax_total = trade_total = bc_total = research_total = 0.0
+
+        if province.region_id is None:
+            province_rows.append(ControlPoolSnapshot(
+                province=province,
+                region=None,
+                turn_number=turn_number,
+                tax_revenue_total=tax_total,
+                tax_revenue_retained=round(tax_total * retain, 2),
+                trade_capacity_total=trade_total,
+                trade_capacity_retained=round(trade_total * retain, 2),
+                bc_total=bc_total,
+                bc_retained=round(bc_total * retain, 2),
+                research_total=research_total,
+                research_retained=round(research_total * retain, 2),
+            ))
+        else:
+            r = province.region_id
+            if r not in region_data:
+                region_data[r] = {
+                    "region_id": r,
+                    "control": control,
+                    "tax": 0.0, "trade": 0.0, "bc": 0.0, "research": 0.0,
+                }
+            region_data[r]["tax"] += tax_total
+            region_data[r]["trade"] += trade_total
+            region_data[r]["bc"] += bc_total
+            region_data[r]["research"] += research_total
+
+    region_rows = []
+    for r_id, totals in region_data.items():
+        control = totals["control"]
+        retain = 1.0 - compute_national_flow_fraction(control)
+        region_rows.append(ControlPoolSnapshot(
+            province=None,
+            region_id=r_id,
+            turn_number=turn_number,
+            tax_revenue_total=round(totals["tax"], 2),
+            tax_revenue_retained=round(totals["tax"] * retain, 2),
+            trade_capacity_total=round(totals["trade"], 2),
+            trade_capacity_retained=round(totals["trade"] * retain, 2),
+            bc_total=round(totals["bc"], 2),
+            bc_retained=round(totals["bc"] * retain, 2),
+            research_total=round(totals["research"], 2),
+            research_retained=round(totals["research"] * retain, 2),
+        ))
+
+    ControlPoolSnapshot.objects.bulk_create(province_rows + region_rows)
 
 
 def _apply_military_upkeep(nation, provinces, trait_effects):

@@ -122,13 +122,14 @@ def compute_normalization_penalties(province, nation, current_turn: int):
 # Normalization duration
 # ---------------------------------------------------------------------------
 
-def get_normalization_duration(nation) -> int:
+def get_normalization_duration(nation, control: float = 100.0) -> int:
     """
     Compute the normalization duration (in turns) for a nation based on its
-    ideology traits.
+    ideology traits and the province's control level.
 
     Base: BASE_NORMALIZATION_TURNS (120 = 10 years).
     Internationalist reduces the duration; Nationalist increases it.
+    Lower control slows normalization (via compute_normalization_control_multiplier).
     """
     duration = BASE_NORMALIZATION_TURNS
     traits = nation.ideology_traits or {}
@@ -142,6 +143,9 @@ def get_normalization_duration(nation) -> int:
         strength = "strong" if trait == strong else "weak"
         modifier = NORMALIZATION_TRAIT_MODIFIERS.get(trait, {}).get(strength, 0)
         duration += modifier
+
+    from .control import compute_normalization_control_multiplier
+    duration = int(duration * compute_normalization_control_multiplier(control))
 
     return max(12, duration)  # minimum 1 year
 
@@ -165,10 +169,11 @@ def start_normalization(province, nation, current_turn: int) -> None:
     to the province's own ideology before calling this (e.g. from the old
     nation, or randomly assigned for unclaimed provinces).
     """
+    from .control import get_province_control
     province.nation = nation
     province.is_core = False
     province.normalization_started_turn = current_turn
-    province.normalization_duration = get_normalization_duration(nation)
+    province.normalization_duration = get_normalization_duration(nation, control=get_province_control(province))
 
     if province.original_nation_id is None:
         province.original_nation = nation

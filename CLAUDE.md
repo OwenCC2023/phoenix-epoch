@@ -99,8 +99,4 @@ When adding model fields, always run `makemigrations <appname> --name descriptiv
 
 ---
 
-## Codebase conventions
-
-**Circular imports** — broken with lazy imports inside functions, not at module level. Follow this pattern when a new `nations/` module needs to call back into `policy_effects.py` or `economy/building_simulation.py`. See `nations/bureaucratic_capacity.py` for an example.
-
-**New systems** — add a constants file + logic module pair (e.g. `bureaucratic_constants.py` + `bureaucratic_capacity.py`). Wire into `policy_effects.validate_policy_change()` for change-time gates and `economy/simulation.simulate_nation_economy()` for per-turn effects. Document in `docs/systems/`.
+**Codebase conventions** — circular imports, new system structure, constants files, migrations → [`docs/conventions.md`](docs/conventions.md)

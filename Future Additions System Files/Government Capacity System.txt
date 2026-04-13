@@ -1,3 +1,39 @@
-Government Capacity System
+Bureaucratic Capacity System
 
-Main Goal: Require growth of bureaucratic capacity to implement Fully-Automated Luxury Gay Space Communism.
+Main Goal: Require growth of bureaucratic capacity to implement more expansive population support programs and intensive regulatory activities.
+
+General Principles:
+	- Certain buildings generate Bureaucratic Capacity.
+	- Policies above a certain tier consume Bureaucratic Capacity.
+	- Governments are limited in their ability to implement support or regulatory systems based on the capabilities of their own internal structures.
+	- Business-focused policies are less cumbersome than individual-focused policies.
+
+Components:
+	- Policy consumption gate: consumption occurs on top two tiers if more than 3 total tiers, otherwise top tier only.
+	- If there is insufficient Bureaucratic Capacity to support the policy, then it cannot be enacted.
+	
+
+Tie-ins with Other Systems:
+	- Buildings:
+	- Policies:
+		- Ecologists have no costs to pro-environment policies.
+		- There are no costs for feminist, anti-slavery, or racial-equity policies.
+		- All others employ this principle: consumption occurs progressively on higher tiers if more than 3 total tiers, otherwise top tier only. Top tier always gets max cost regardless of number of proceeding tiers.
+	- Government Options:
+		- Top-Down gets a big multiplicative bonus to Bureaucratic Capacity.
+		- Collectivist gets a small multiplicative bonus to Bureaucratic Capacity.
+		- Representative gets a small multiplicative bonus to Bureaucratic Capacity.
+		- Singular gets a big multiplicative bonus to Bureaucratic Capacity.
+		- Elections gets a small multiplicative bonus to Bureaucratic Capacity.
+		
+		- Resource gets a small multiplicative malus to Bureaucratic Capacity.
+		- Military Power gets a small multiplicative malus to Bureaucratic Capacity.
+		- Multi-Body gets a small multiplicative malus to Bureaucratic Capacity.
+		- Staggered Groups gets a big multiplicative malus to Bureaucratic Capacity.
+	- Ideologies:
+		- Modern gets a multiplicative bonus to Bureaucratic Capacity.
+		- Internationalist gets a multiplicative cost-reduction to treaty costs.
+		- Libertarian gets a multiplicative malus to Bureaucratic Capacity.
+		- Ecologists have no costs to pro-environment policies.
+	- Diplomacy (stub):
+		- Entering into and enforcing treaties takes bureaucratic capacity.

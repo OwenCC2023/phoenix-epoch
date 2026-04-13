@@ -41,10 +41,11 @@ Read the relevant system doc in `docs/systems/` before modifying a system.
 11. [Literacy & Research](docs/systems/literacy_research_system.md) — S-curve growth, research unlocks
 12. [Provincial Integration](docs/systems/provincial_integration_system.md) — normalization, acquisition
 13. [Trade](docs/systems/trade_system.md) — Dijkstra routes, capacity pools, in-flight transit
+14. [Bureaucratic Capacity](docs/systems/bureaucratic_capacity_system.md) — building supply, policy consumption gates, gov/trait multipliers, deficit penalties
 
 **Balance philosophy** — calibrated constants, food economy, industrialisation arc → [`docs/balance_philosophy.md`](docs/balance_philosophy.md)
 
-**Future systems & stubs** — military plan, bureaucratic capacity, unbuilt features, stub effect keys → [`docs/future_systems.md`](docs/future_systems.md)
+**Future systems & stubs** — military plan, unbuilt features, stub effect keys → [`docs/future_systems.md`](docs/future_systems.md)
 
 ---
 

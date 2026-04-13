@@ -146,6 +146,27 @@ def simulate_nation_economy(nation, turn_number):
     from nations.policy_effects import get_nation_policy_effects
     policy_effects = get_nation_policy_effects(nation)
 
+    # Bureaucratic capacity: supply vs demand.
+    # If demand exceeds supply, reduce positive policy effects proportionally
+    # (most expensive policies lose benefits first) and track stability penalty.
+    from nations.bureaucratic_capacity import (
+        compute_bureaucratic_supply,
+        compute_total_bureaucratic_demand,
+        compute_bureaucratic_deficit_penalties,
+        apply_deficit_to_policy_effects,
+    )
+    bc_supply = compute_bureaucratic_supply(nation, provinces)
+    bc_demand = compute_total_bureaucratic_demand(nation)
+    bc_stability_penalty = 0.0
+    if bc_demand["total"] > bc_supply["total"]:
+        bc_penalties = compute_bureaucratic_deficit_penalties(
+            bc_supply["total"], bc_demand["total"], bc_demand["per_policy"]
+        )
+        bc_stability_penalty = bc_penalties["stability_penalty"]
+        policy_effects = apply_deficit_to_policy_effects(
+            policy_effects, bc_penalties["global_benefit_factor"]
+        )
+
     # Apply trait + policy bonuses to national modifiers.
     # Both old-style keys (integration_bonus, research_bonus) and new-style
     # keys (integration_pct, research_pct) are checked and summed.
@@ -491,10 +512,10 @@ def simulate_nation_economy(nation, turn_number):
         final = pool.__dict__.get(key, 0) + modified_pool.get(key, 0) + trade_net[key] - gov_upkeep.get(key, 0)
         final_pools[key] = round(max(0, final), 2)
 
-    # Step 11: National stability (includes trait bonuses)
+    # Step 11: National stability (includes trait bonuses + bureaucratic deficit)
     stability_modifier = national_modifiers.get("stability", 0) + stability_bonus_from_traits
     avg_stability = sum(p.local_stability for p in provinces) / len(provinces) if provinces else 50
-    national_stability = max(0, min(100, avg_stability + stability_modifier))
+    national_stability = max(0, min(100, avg_stability + stability_modifier - bc_stability_penalty))
     final_pools["stability"] = round(national_stability, 2)
 
     # Step 12: Food deficit collapse tracking

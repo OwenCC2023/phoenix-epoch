@@ -53,6 +53,7 @@ TRAIT_DEFS = {
             "consumption_pct": 0.03,
             "trade_capacity_bonus": 0.20,
             "diplomatic_reputation_bonus": 0.10,
+            "treaty_bureaucratic_reduction": 0.30,
         },
         "weak_effects": {
             "stability_bonus": -0.5,
@@ -60,6 +61,7 @@ TRAIT_DEFS = {
             "trade_pct": 0.05,
             "trade_capacity_bonus": 0.10,
             "diplomatic_reputation_bonus": 0.05,
+            "treaty_bureaucratic_reduction": 0.15,
         },
     },
     "nationalist": {
@@ -142,12 +144,14 @@ TRAIT_DEFS = {
             "wealth_production_bonus": 0.08,
             "production_wealth_pct": 0.06,
             "corruption_resistance": 0.03,
+            "bureaucratic_capacity_malus": -0.15,
         },
         "weak_effects": {
             "stability_bonus": -1.0,
             "trade_pct": 0.03,
             "upkeep_reduction": 0.06,
             "wealth_production_bonus": 0.04,
+            "bureaucratic_capacity_malus": -0.08,
         },
     },
     "authoritarian": {
@@ -388,6 +392,7 @@ TRAIT_DEFS = {
             "rural_output_bonus": 0.15,
             "urban_growth_penalty": -0.003,
             "environmental_health": 0.08,
+            "bureaucratic_environment_exempt": True,
             "building_restrictions": ["refinery", "advanced_refinery", "oil_well", "fuel_depot"],
             "building_efficiency_bonus": {
                 "farming": 0.10,
@@ -399,6 +404,7 @@ TRAIT_DEFS = {
             "rural_output_bonus": 0.08,
             "urban_growth_penalty": -0.001,
             "environmental_health": 0.04,
+            "bureaucratic_environment_exempt": True,
             "building_restrictions": ["refinery", "advanced_refinery", "oil_well", "fuel_depot"],
             "building_efficiency_bonus": {
                 "farming": 0.05,
@@ -417,6 +423,7 @@ TRAIT_DEFS = {
             "research_bonus": 0.10,
             "literacy_bonus": 0.03,
             "corruption_resistance": 0.02,
+            "bureaucratic_capacity_bonus": 0.15,
             "building_efficiency_bonus": {
                 "communications": 0.10,
                 "light_manufacturing": 0.06,
@@ -426,6 +433,7 @@ TRAIT_DEFS = {
             "stability_bonus": -1.0,
             "research_bonus": 0.05,
             "literacy_bonus": 0.01,
+            "bureaucratic_capacity_bonus": 0.08,
             "building_efficiency_bonus": {
                 "communications": 0.05,
             },

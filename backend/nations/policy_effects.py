@@ -301,6 +301,11 @@ def validate_policy_change(nation, category, new_level):
                 f"current policy {banned_cat} level {banned_level}"
             )
 
+    # 6. Check bureaucratic capacity
+    from .bureaucratic_capacity import validate_bureaucratic_capacity
+    capacity_errors = validate_bureaucratic_capacity(nation, category, new_level)
+    errors.extend(capacity_errors)
+
     return errors
 
 

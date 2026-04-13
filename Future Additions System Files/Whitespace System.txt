@@ -1,3 +1,14 @@
 Whitespace System
 
 Main Goal: Allow provincial changes and ideologies of now-fallen nations to persist after their demise.
+
+General Principles:
+	- 
+
+Components:
+	- 
+
+Tie-ins with Other Systems:
+	- Buildings:
+	- Policies:
+	- Ideologies:

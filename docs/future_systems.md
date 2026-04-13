@@ -17,9 +17,6 @@ Summary of what needs to be built:
 - **Military upkeep** — deducted per active unit per turn; units go inactive on deficit (not destroyed)
 - **Pacifist** → adds `weapons_factory` to building_restrictions; **Militarist** → base efficiency bonuses + training_speed_bonus
 
-## Bureaucratic capacity
-The `capital` designation is a stub. Once built, government buildings in the capital should provide bureaucratic capacity that enables larger nations (higher integration efficiency, more provinces before administrative penalties, etc.).
-
 ## Events system
 `GameEvent` model and `events/helpers.py` exist. GM-created events can apply national modifiers. Not yet integrated into turn resolution loop.
 
@@ -39,7 +36,7 @@ The `capital` designation is a stub. Once built, government buildings in the cap
 
 **National scope:**
 - `construction_cost_reduction` — computed by `get_construction_modifiers()` but not applied in build API
-- `bureaucratic_capacity` — use-it-or-lose-it capacity system (declared in `NATIONAL_EFFECT_KEYS`)
+- `bureaucratic_capacity` — **now wired**: see `docs/systems/bureaucratic_capacity_system.md`; buildings provide flat capacity, policies scale it, government/trait multipliers apply, policy change gate and deficit penalties in simulation
 - `army_training_speed_bonus`, `navy_training_speed_bonus`, `air_training_speed_bonus` — wired in skeleton when military simulation built
 - `army_combat_bonus`, `navy_combat_bonus`, `air_combat_bonus` — wired when combat system built
 - `army_upkeep_reduction`, `navy_upkeep_reduction`, `air_upkeep_reduction` — wired when military upkeep system built

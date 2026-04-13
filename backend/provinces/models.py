@@ -5,6 +5,7 @@ from django.db import models
 from .constants import (
     TERRAIN_TYPES, TERRAIN_BASE_POPULATION, DEFAULT_PROVINCE_POPULATION,
     RELIEF_TYPES, VEGETATION_LEVELS, TEMPERATURE_BANDS,
+    RELIEF_POP_MODIFIER, VEGETATION_POP_MODIFIER, TEMPERATURE_POP_MODIFIER,
 )
 
 
@@ -50,14 +51,31 @@ class RiverZone(models.Model):
         return f"{self.name} (River, game {self.game_id})"
 
 
-def randomise_starting_population(terrain_type: str) -> int:
+def randomise_starting_population(
+    terrain_type: str,
+    relief: str = "flat",
+    vegetation_level: str = "medium",
+    temperature_band: str = "mild",
+) -> int:
     """Return a randomised starting population for a new province.
 
-    Centred on the terrain baseline, ±30 %, rounded to the nearest 100.
-    Call this explicitly when creating a Province rather than relying on
-    field default, because the terrain type is needed to pick the baseline.
+    Centred on the terrain baseline modified by relief, vegetation, and
+    temperature, then randomised ±30 %, rounded to the nearest 100.
+
+    The three new axes were introduced with the trade system. Defaults
+    preserve backward compatibility for callers that only pass terrain_type.
+
+    Combined formula:
+        base = TERRAIN_BASE_POPULATION[terrain]
+               × RELIEF_POP_MODIFIER[relief]
+               × VEGETATION_POP_MODIFIER[vegetation]
+               × TEMPERATURE_POP_MODIFIER[temperature]
+        result ∈ [base × 0.70, base × 1.30], rounded to nearest 100
     """
     base = TERRAIN_BASE_POPULATION.get(terrain_type, DEFAULT_PROVINCE_POPULATION)
+    base = base * RELIEF_POP_MODIFIER.get(relief, 1.0)
+    base = base * VEGETATION_POP_MODIFIER.get(vegetation_level, 1.0)
+    base = base * TEMPERATURE_POP_MODIFIER.get(temperature_band, 1.0)
     low = int(base * 0.70)
     high = int(base * 1.30)
     raw = random.randint(low, high)
@@ -149,6 +167,12 @@ class Province(models.Model):
     # how long the full normalization period lasts (in turns).
     normalization_started_turn = models.PositiveIntegerField(null=True, blank=True)
     normalization_duration = models.PositiveIntegerField(null=True, blank=True)
+
+    # De-integration tracks ideology fade when a province leaves a nation.
+    # Separate from normalization fields — a province could be re-acquired
+    # mid-deintegration, requiring both state machines to run independently.
+    deintegration_started_turn = models.PositiveIntegerField(null=True, blank=True)
+    deintegration_duration = models.PositiveIntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

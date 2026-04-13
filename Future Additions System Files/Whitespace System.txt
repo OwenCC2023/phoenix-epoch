@@ -3,12 +3,27 @@ Whitespace System
 Main Goal: Allow provincial changes and ideologies of now-fallen nations to persist after their demise.
 
 General Principles:
-	- 
+	- Some provinces exist outside of nations - these are colored white on the world map and called whitespace.
+	- Provinces outside nations still have populations that are stable.
+	- Ideologies outside nations are not consistent across provinces, but the provinces next to each other tend to have similar ideologies.
+	- Provinces outside nations can become parts of nations.
+	- Provinces that are a part of a nation can become outside of national control if the nation they are part of collapses, or a peace deal requires it, or the nation gives up their control over that province.
+	- Provinces that leave nations retain the influences of the ideologies of that nation for a time.
+	- Provinces next to, but are not a part of, nations get influenced ideologically by the nation's ideology.
+	- Provinces all start the game with randomly assigned ideologies. Those that are part of the starting territory of a nation get the provincial ideologies overridden at game start by the national ideologies.
 
 Components:
-	- 
+	- Conversion back to whitespace works like the Provincial Integration System, but in reverse.
+	- Cross-Provincial Ideological Melding where nearby ideologies influence each other. Higher-pop provinces exert more ideological pressure on low-pop provinces.
+	- Whitespace provinces have populations (assumed stable at the randomly-determined level appropriate for the province type).
+	- Whitespace populations can migrate (stub for inclusion in International Migration System).
+	- Whitespace provinces are assumed to have little in the way of centralized government, economies, militaries, or infrastructure.
 
 Tie-ins with Other Systems:
 	- Buildings:
+		- None
 	- Policies:
+		- Migration/Visa policies (stub for International Migration System).
 	- Ideologies:
+		- Each province has a random set of ideologies that adhere to ideology-selection rules that are assigned at game start and vary over time.
+		- Provinces with militarist and nationalist ideologies are more likely to spawn rebels when expanded into (stub for Control and Rebellion System).

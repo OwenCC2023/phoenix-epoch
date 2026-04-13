@@ -23,6 +23,10 @@ Summary of what needs to be built:
 ## Province control / conquest
 **Economic acquisition and espionage persuasion (System 12) are implemented.** Military conquest, diplomatic acquisition, and the full combat system are not yet built. Provinces can be reassigned via admin for testing.
 
+## Whitespace stubs (System 15)
+- **International Migration** — `WHITESPACE_MIGRATION_ENABLED = False` in `economy/whitespace_constants.py`. When built, whitespace populations will participate in cross-border migration flows. Wire into `_simulate_whitespace_province()` in `economy/whitespace.py`.
+- **Rebel spawning** — `REBEL_SPAWNING_ENABLED = False` in `economy/whitespace_constants.py`. Provinces with `militarist` or `nationalist` strong/weak traits will eventually have a per-turn chance of spawning rebel units. Wire into the Control and Rebellion System when built.
+
 ## Construction cost/time reduction (wiring stub)
 `construction_cost_reduction` (national) and `construction_time_reduction` (province) effects are computed by buildings but not yet applied in the build API. `get_construction_modifiers(nation)` in `building_simulation.py` aggregates cost reduction and is ready to call from the construction view.
 

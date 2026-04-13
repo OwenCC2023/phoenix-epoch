@@ -141,6 +141,9 @@ class GameStartView(APIView):
         game.current_turn_deadline = timezone.now() + timedelta(hours=game.turn_duration_hours)
         game.save()
 
+        from economy.whitespace import initialize_whitespace
+        initialize_whitespace(game)
+
         return Response(GameSerializer(game).data, status=status.HTTP_200_OK)
 
 

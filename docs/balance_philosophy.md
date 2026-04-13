@@ -6,6 +6,10 @@ The calibration target is a **30-year rebuilding arc** (~360 months) with provin
 
 ## Province starting populations (randomised ±30%)
 
+Population is calculated as `terrain_base × relief_mod × vegetation_mod × temperature_mod`, then randomised ±30% and rounded to the nearest 100.
+
+**Terrain base:**
+
 | Terrain | Base |
 |---------|------|
 | river_valley | 12,000 |
@@ -17,7 +21,22 @@ The calibration target is a **30-year rebuilding arc** (~360 months) with provin
 | desert | 4,000 |
 | wasteland | 3,000 |
 
-Use `provinces.models.randomise_starting_population(terrain_type)` when creating provinces — do not rely on the field default alone.
+**Multipliers (provinces/constants.py):**
+
+| Relief | Mod | | Vegetation | Mod | | Temperature | Mod |
+|--------|-----|-|------------|-----|-|-------------|-----|
+| flat | 1.00 | | none | 0.80 | | mild | 1.00 |
+| hilly | 0.90 | | low | 0.95 | | hot | 0.90 |
+| rugged | 0.80 | | medium | 1.00 | | cold | 0.85 |
+| marshy | 0.85 | | high | 0.90 | | | |
+| mountainous | 0.70 | | | | | | |
+
+**Example combined ranges (before ±30% spread):**
+- River valley, flat, medium, mild: 12000 × 1.0 × 1.0 × 1.0 = **12,000**
+- Plains, hilly, low, hot: 10000 × 0.9 × 0.95 × 0.9 = **7,695**
+- Wasteland, mountainous, none, cold: 3000 × 0.7 × 0.8 × 0.85 = **1,428**
+
+Use `provinces.models.randomise_starting_population(terrain_type, relief, vegetation_level, temperature_band)` when creating provinces — do not rely on the field default alone. Defaults for the new axes are `flat / medium / mild` for backward compatibility.
 
 ## Key calibrated constants and why
 

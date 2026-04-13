@@ -79,25 +79,40 @@ class ProvinceSerializer(serializers.ModelSerializer):
         source="adjacent_river_zones", many=True, read_only=True
     )
     normalization_progress = serializers.SerializerMethodField()
+    deintegration_progress = serializers.SerializerMethodField()
 
-    def get_normalization_progress(self, province):
-        if province.is_core or province.normalization_started_turn is None:
-            return 1.0
-        from economy.normalization import compute_normalization_progress
-        # We don't have current_turn in context; approximate from stored fields.
-        # The simulation updates these fields each turn, so we compute from
-        # normalization_started_turn and normalization_duration alone.
-        # Return None if the context doesn't have turn info.
+    def _get_current_turn(self, province):
+        """Resolve the game's current turn number from request context."""
         request = self.context.get("request")
         if request:
             game_id = request.parser_context.get("kwargs", {}).get("game_id")
             if game_id:
                 from games.models import Game
                 try:
-                    game = Game.objects.get(pk=game_id)
-                    return round(compute_normalization_progress(province, game.current_turn_number), 3)
+                    return Game.objects.get(pk=game_id).current_turn_number
                 except Game.DoesNotExist:
                     pass
+        return None
+
+    def get_normalization_progress(self, province):
+        if province.is_core or province.normalization_started_turn is None:
+            return 1.0
+        from economy.normalization import compute_normalization_progress
+        current_turn = self._get_current_turn(province)
+        if current_turn is not None:
+            return round(compute_normalization_progress(province, current_turn), 3)
+        return None
+
+    def get_deintegration_progress(self, province):
+        """0.0 = just released, 1.0 = fully de-integrated (native whitespace)."""
+        if province.deintegration_started_turn is None:
+            return None
+        from economy.whitespace_constants import BASE_DEINTEGRATION_TURNS
+        duration = province.deintegration_duration or BASE_DEINTEGRATION_TURNS
+        current_turn = self._get_current_turn(province)
+        if current_turn is not None:
+            elapsed = current_turn - province.deintegration_started_turn
+            return round(min(1.0, elapsed / max(1, duration)), 3)
         return None
 
     class Meta:
@@ -123,6 +138,9 @@ class ProvinceSerializer(serializers.ModelSerializer):
             "normalization_duration",
             "original_nation",
             "normalization_progress",
+            "deintegration_started_turn",
+            "deintegration_duration",
+            "deintegration_progress",
             "center_x",
             "center_y",
             "sea_border_distance",

@@ -42,8 +42,8 @@ from .literacy import (
 from .normalization import (
     check_normalization_completion,
     compute_normalization_penalties,
-    drift_unclaimed_ideology,
 )
+from .whitespace import simulate_all_whitespace
 
 
 RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
@@ -106,11 +106,8 @@ def simulate_economy_for_game(game, turn_number):
     for nation in nations:
         simulate_nation_economy(nation, turn_number)
 
-    # Drift ideology of unclaimed provinces (no nation).
-    unclaimed = Province.objects.filter(game=game, nation__isnull=True)
-    for province in unclaimed:
-        drift_unclaimed_ideology(province)
-        province.save(update_fields=["ideology_traits"])
+    # Simulate whitespace provinces (nation=None): de-integration, melding, drift.
+    simulate_all_whitespace(game, turn_number)
 
 
 @transaction.atomic

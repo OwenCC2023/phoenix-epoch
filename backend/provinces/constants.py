@@ -182,6 +182,36 @@ TERRAIN_BASE_POPULATION = {
 # Fallback when terrain_type is not in TERRAIN_BASE_POPULATION
 DEFAULT_PROVINCE_POPULATION = 10000
 
+# ---------------------------------------------------------------------------
+# Population modifiers for trade-system province attributes
+# ---------------------------------------------------------------------------
+# These multiply TERRAIN_BASE_POPULATION to reflect habitability.
+# Applied in randomise_starting_population() in models.py.
+
+# Relief: flat land is easiest to settle; steep/waterlogged terrain reduces it.
+RELIEF_POP_MODIFIER = {
+    "flat":        1.00,   # baseline
+    "hilly":       0.90,   # moderate difficulty
+    "rugged":      0.80,   # harder to farm and build
+    "marshy":      0.85,   # disease risk, but water access
+    "mountainous": 0.70,   # hardest to settle
+}
+
+# Vegetation: medium coverage is optimal; barren or dense extremes reduce it.
+VEGETATION_POP_MODIFIER = {
+    "none":   0.80,   # barren — little to forage or shelter
+    "low":    0.95,   # sparse — manageable
+    "medium": 1.00,   # baseline — balanced resources
+    "high":   0.90,   # dense canopy — hard to clear and farm
+}
+
+# Temperature: mild is most habitable; extremes shorten growing seasons.
+TEMPERATURE_POP_MODIFIER = {
+    "mild": 1.00,   # baseline
+    "hot":  0.90,   # heat stress and water scarcity
+    "cold": 0.85,   # harsh winters and shorter growing season
+}
+
 # --- Province designation system -------------------------------------------
 #
 # Designation (rural / urban / post_urban) is computed each turn from:

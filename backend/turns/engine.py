@@ -793,6 +793,8 @@ class TurnResolutionEngine:
                     nation.is_alive = False
                     nation.save(update_fields=["is_alive"])
                     self._log(f"NATION COLLAPSED: {nation.name} (starvation for {pool.consecutive_food_deficit_turns} turns)")
+                    from economy.whitespace import release_nation_provinces
+                    release_nation_provinces(nation, turn.turn_number)
             except NationResourcePool.DoesNotExist:
                 pass
 

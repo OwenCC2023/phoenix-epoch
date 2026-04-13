@@ -42,6 +42,7 @@ Read the relevant system doc in `docs/systems/` before modifying a system.
 12. [Provincial Integration](docs/systems/provincial_integration_system.md) — normalization, acquisition
 13. [Trade](docs/systems/trade_system.md) — Dijkstra routes, capacity pools, in-flight transit
 14. [Bureaucratic Capacity](docs/systems/bureaucratic_capacity_system.md) — building supply, policy consumption gates, gov/trait multipliers, deficit penalties
+15. [Whitespace](docs/systems/whitespace_system.md) — unclaimed province simulation, de-integration, cross-provincial ideology melding, game-start init, population formula rework (relief/vegetation/temperature modifiers)
 
 **Balance philosophy** — calibrated constants, food economy, industrialisation arc → [`docs/balance_philosophy.md`](docs/balance_philosophy.md)
 
@@ -76,7 +77,7 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe mana
 DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe manage.py makemigrations
 
 # Import smoke test
-DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "import django; django.setup(); from economy.simulation import simulate_nation_economy; from trade.simulation import recompute_route_paths; print('OK')"
+DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "import django; django.setup(); from economy.simulation import simulate_nation_economy; from trade.simulation import recompute_route_paths; from nations.bureaucratic_capacity import compute_bureaucratic_supply; print('OK')"
 ```
 
 **Note:** Use `./venv/Scripts/python.exe` (not `python` — Windows Store intercept). Always set `DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev`.
@@ -89,9 +90,17 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "
 |-----|-----------|
 | economy | 0001_initial → 0006_remove_tradeoffer |
 | nations | 0001_initial → 0004_add_capital_province |
-| provinces | 0001_initial → 0011_seed_relief_from_terrain |
+| provinces | 0001_initial → 0012_deintegration_fields |
 | espionage | 0001_create_espionage_models |
 | trade | 0001_create_traderoute_capitalrelocation |
 | All others | 0001_initial |
 
 When adding model fields, always run `makemigrations <appname> --name descriptive_name`.
+
+---
+
+## Codebase conventions
+
+**Circular imports** — broken with lazy imports inside functions, not at module level. Follow this pattern when a new `nations/` module needs to call back into `policy_effects.py` or `economy/building_simulation.py`. See `nations/bureaucratic_capacity.py` for an example.
+
+**New systems** — add a constants file + logic module pair (e.g. `bureaucratic_constants.py` + `bureaucratic_capacity.py`). Wire into `policy_effects.validate_policy_change()` for change-time gates and `economy/simulation.simulate_nation_economy()` for per-turn effects. Document in `docs/systems/`.

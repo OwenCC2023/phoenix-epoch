@@ -38,6 +38,51 @@ class ResourceLedger(models.Model):
         unique_together = ("nation", "turn_number")
         ordering = ["-turn_number"]
 
+
+class ControlPoolSnapshot(models.Model):
+    """Per-turn snapshot of what control retains at province or region level.
+
+    Informational only — these pools do not interact with gameplay yet.
+    Exactly one of province or region is set per row.
+
+    Provinces in a region have their pools aggregated at the region level;
+    provinces outside any region are tracked individually.
+    """
+
+    province = models.ForeignKey(
+        "provinces.Province",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="control_snapshots",
+    )
+    region = models.ForeignKey(
+        "provinces.Region",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="control_snapshots",
+    )
+    turn_number = models.PositiveIntegerField()
+
+    # Total = what was produced before control was applied.
+    # Retained = total × (1 − control/100) — stays at province/region level.
+    tax_revenue_total = models.FloatField(default=0)
+    tax_revenue_retained = models.FloatField(default=0)
+    trade_capacity_total = models.FloatField(default=0)
+    trade_capacity_retained = models.FloatField(default=0)
+    bc_total = models.FloatField(default=0)
+    bc_retained = models.FloatField(default=0)
+    research_total = models.FloatField(default=0)
+    research_retained = models.FloatField(default=0)
+
+    class Meta:
+        ordering = ["-turn_number"]
+
+    def __str__(self):
+        target = f"province {self.province_id}" if self.province_id else f"region {self.region_id}"
+        return f"ControlPoolSnapshot({target}, turn {self.turn_number})"
+
     def __str__(self):
         return f"Ledger: {self.nation} Turn {self.turn_number}"
 

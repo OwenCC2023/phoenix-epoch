@@ -393,11 +393,20 @@ def _simulate_whitespace_province(
         if province.ideology_traits != old_traits:
             modified.add("ideology_traits")
 
-    # Step 4: Future stubs (no-ops for now).
+    # Step 4: Rebel spawning for militarist/nationalist whitespace provinces.
+    if REBEL_SPAWNING_ENABLED:
+        province_traits = province.ideology_traits or {}
+        trait_keys = set()
+        if province_traits.get("strong"):
+            trait_keys.add(province_traits["strong"])
+        trait_keys.update(province_traits.get("weak", []))
+        if trait_keys & REBEL_SPAWN_TRAITS:
+            from .rebellion import spawn_whitespace_rebels
+            spawn_whitespace_rebels(province, turn_number)
+
+    # Step 5: Future stubs.
     # if WHITESPACE_MIGRATION_ENABLED:
     #     pass  # future: whitespace migration
-    # if REBEL_SPAWNING_ENABLED:
-    #     pass  # future: rebel spawning for militarist/nationalist provinces
 
     return modified
 

@@ -24,7 +24,7 @@ DOMAIN_TO_BASE = {
     "air": "air_base",
 }
 
-# Unit types each domain can train
+# Unit types each domain can train (excludes rebel — not recruitable by players)
 DOMAIN_UNITS = {
     "army": ["militia", "infantry", "motorized", "armored", "artillery"],
     "navy": ["patrol_boat", "frigate", "transport"],
@@ -141,5 +141,19 @@ UNIT_TYPES = {
         "manpower_cost": 200,
         "construction_turns": 16,
         "upkeep": {"military_goods": 80, "fuel": 100},
+    },
+    # -------------------------------------------------------
+    # REBEL — spawned by the Control and Rebellion System
+    # Cannot be recruited by players; requires no maintenance.
+    # -------------------------------------------------------
+    "rebel": {
+        "domain": "army",
+        "name": "Rebel Militia",
+        "description": "Locally spawned rebel force fighting against national control.",
+        "military_goods_cost": 0,
+        "manpower_cost": 0,
+        "construction_turns": 0,
+        "upkeep": {},
+        "is_rebel": True,
     },
 }

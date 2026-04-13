@@ -89,6 +89,12 @@ def simulate_espionage(game, turn_number):
             ).values_list("target_province_id", flat=True)
         )
 
+        from economy.control import get_province_control, compute_espionage_defense_multiplier, compute_espionage_transparency_bonus
+        avg_control = (
+            sum(get_province_control(p) for p in provinces) / len(provinces)
+            if provinces else 100.0
+        )
+
         nation_data[nation.id] = {
             "nation": nation,
             "provinces": provinces,
@@ -98,6 +104,7 @@ def simulate_espionage(game, turn_number):
             "national_bldg": national_bldg,
             "active_policies": active_policies,
             "fia_level": fia_level,
+            "avg_control": avg_control,
             "stability": stability,
             "espionage_bonus": espionage_bonus,
             "counter_espionage_bonus": counter_espionage_bonus,
@@ -137,7 +144,12 @@ def simulate_espionage(game, turn_number):
                 literacy_advantage=literacy_adv_defense,
             )
 
+            # Control weakens espionage defense and boosts foreign transparency.
+            from economy.control import compute_espionage_defense_multiplier, compute_espionage_transparency_bonus
+            national_defense *= compute_espionage_defense_multiplier(t_data["avg_control"])
+
             transparency = compute_transparency(national_attack, national_defense)
+            transparency += compute_espionage_transparency_bonus(t_data["avg_control"])
 
             # Check for investigate_province actions — per-province transparency boost
             investigate_actions = EspionageAction.objects.filter(

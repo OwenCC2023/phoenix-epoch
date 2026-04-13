@@ -2,13 +2,15 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AirZone, Building, Province, ProvinceSectorAllocation, RiverZone, SeaZone
+from .models import AirZone, Building, Province, ProvinceSectorAllocation, Region, RiverZone, SeaZone
 from .serializers import (
     AirZoneSerializer,
     BuildingSerializer,
+    ControlPoolSnapshotSerializer,
     ProvinceSectorAllocationBulkSerializer,
     ProvinceSectorAllocationSerializer,
     ProvinceSerializer,
+    RegionSerializer,
     RiverZoneSerializer,
     SeaZoneSerializer,
 )
@@ -297,6 +299,251 @@ class BuildingView(APIView):
             )
 
         return Response(BuildingSerializer(building).data, status=status.HTTP_201_CREATED)
+
+
+class RegionListCreateView(APIView):
+    """
+    GET  /api/games/{game_id}/nations/{nation_id}/regions/ - List all regions for a nation.
+    POST /api/games/{game_id}/nations/{nation_id}/regions/ - Create a new region.
+
+    POST payload: {"name": "Northern Provinces", "control": 80.0}
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _get_nation(self, game_id, nation_id, user):
+        from nations.models import Nation
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return None, Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+        if nation.player != user:
+            return None, Response({"detail": "You do not own this nation."}, status=status.HTTP_403_FORBIDDEN)
+        return nation, None
+
+    def get(self, request, game_id, nation_id):
+        nation, err = self._get_nation(game_id, nation_id, request.user)
+        if err:
+            return err
+        regions = Region.objects.filter(nation=nation).prefetch_related("provinces")
+        return Response(RegionSerializer(regions, many=True).data)
+
+    def post(self, request, game_id, nation_id):
+        nation, err = self._get_nation(game_id, nation_id, request.user)
+        if err:
+            return err
+        serializer = RegionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        region = serializer.save(nation=nation)
+        return Response(RegionSerializer(region).data, status=status.HTTP_201_CREATED)
+
+
+class RegionDetailView(APIView):
+    """
+    GET    /api/games/{game_id}/nations/{nation_id}/regions/{pk}/ - Region detail.
+    PATCH  /api/games/{game_id}/nations/{nation_id}/regions/{pk}/ - Update name/control.
+    DELETE /api/games/{game_id}/nations/{nation_id}/regions/{pk}/ - Delete region.
+
+    PATCH payload: {"control": 60.0} or {"name": "New Name"} (partial update).
+    Updating control automatically pushes the new value to all member provinces.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _get_region(self, game_id, nation_id, pk, user):
+        from nations.models import Nation
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return None, Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+        if nation.player != user:
+            return None, Response({"detail": "You do not own this nation."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            region = Region.objects.prefetch_related("provinces").get(pk=pk, nation=nation)
+        except Region.DoesNotExist:
+            return None, Response({"detail": "Region not found."}, status=status.HTTP_404_NOT_FOUND)
+        return region, None
+
+    def get(self, request, game_id, nation_id, pk):
+        region, err = self._get_region(game_id, nation_id, pk, request.user)
+        if err:
+            return err
+        return Response(RegionSerializer(region).data)
+
+    def patch(self, request, game_id, nation_id, pk):
+        region, err = self._get_region(game_id, nation_id, pk, request.user)
+        if err:
+            return err
+        serializer = RegionSerializer(region, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        region = serializer.save()
+        # If control changed, push the new value to all member provinces.
+        if "control" in request.data:
+            from economy.control import sync_region_control
+            updated_provinces = sync_region_control(region)
+            Province.objects.bulk_update(updated_provinces, ["control"], batch_size=200)
+        return Response(RegionSerializer(region).data)
+
+    def delete(self, request, game_id, nation_id, pk):
+        region, err = self._get_region(game_id, nation_id, pk, request.user)
+        if err:
+            return err
+        region.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RegionAddProvinceView(APIView):
+    """
+    POST /api/games/{game_id}/nations/{nation_id}/regions/{pk}/add-province/
+
+    Payload: {"province_id": 42}
+    Adds a province owned by the nation to the region and syncs its control.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, game_id, nation_id, pk):
+        from nations.models import Nation
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+        if nation.player != request.user:
+            return Response({"detail": "You do not own this nation."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            region = Region.objects.get(pk=pk, nation=nation)
+        except Region.DoesNotExist:
+            return Response({"detail": "Region not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        province_id = request.data.get("province_id")
+        if not province_id:
+            return Response({"detail": "province_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            province = Province.objects.get(pk=province_id, game_id=game_id, nation=nation)
+        except Province.DoesNotExist:
+            return Response(
+                {"detail": "Province not found or not owned by your nation."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        province.region = region
+        province.control = region.control
+        province.save(update_fields=["region", "control"])
+        return Response(ProvinceSerializer(province, context={"request": request}).data)
+
+
+class RegionRemoveProvinceView(APIView):
+    """
+    POST /api/games/{game_id}/nations/{nation_id}/regions/{pk}/remove-province/
+
+    Payload: {"province_id": 42}
+    Removes a province from the region. Province control is preserved at its
+    current (region-inherited) level but is now individually managed.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, game_id, nation_id, pk):
+        from nations.models import Nation
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+        if nation.player != request.user:
+            return Response({"detail": "You do not own this nation."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            region = Region.objects.get(pk=pk, nation=nation)
+        except Region.DoesNotExist:
+            return Response({"detail": "Region not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        province_id = request.data.get("province_id")
+        if not province_id:
+            return Response({"detail": "province_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            province = Province.objects.get(pk=province_id, game_id=game_id, nation=nation, region=region)
+        except Province.DoesNotExist:
+            return Response(
+                {"detail": "Province not found in this region."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        province.region = None
+        province.save(update_fields=["region"])
+        return Response(ProvinceSerializer(province, context={"request": request}).data)
+
+
+class ProvinceControlView(APIView):
+    """
+    PATCH /api/games/{game_id}/provinces/{pk}/control/
+
+    Payload: {"control": 70.0}
+    Sets the province's individual control level. Returns 400 if the province
+    belongs to a region (use the region PATCH endpoint instead).
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, game_id, pk):
+        try:
+            province = Province.objects.select_related("nation", "region").get(
+                pk=pk, game_id=game_id
+            )
+        except Province.DoesNotExist:
+            return Response({"detail": "Province not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if province.nation is None or province.nation.player != request.user:
+            return Response({"detail": "You do not own this province."}, status=status.HTTP_403_FORBIDDEN)
+
+        if province.region_id is not None:
+            return Response(
+                {"detail": "Province belongs to a region. Update the region's control level instead."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        control = request.data.get("control")
+        if control is None:
+            return Response({"detail": "control is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            control = float(control)
+        except (TypeError, ValueError):
+            return Response({"detail": "control must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if control < 1.0 or control > 100.0:
+            return Response(
+                {"detail": "control must be between 1 and 100."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        province.control = control
+        province.save(update_fields=["control"])
+        return Response(ProvinceSerializer(province, context={"request": request}).data)
+
+
+class RebellionListView(APIView):
+    """
+    GET /api/games/{game_id}/nations/{nation_id}/rebellions/
+
+    List all rebel-occupied provinces for a nation with timer state.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, game_id, nation_id):
+        from nations.models import Nation
+        try:
+            nation = Nation.objects.get(pk=nation_id, game_id=game_id)
+        except Nation.DoesNotExist:
+            return Response({"detail": "Nation not found."}, status=status.HTTP_404_NOT_FOUND)
+        if nation.player != request.user:
+            return Response({"detail": "You do not own this nation."}, status=status.HTTP_403_FORBIDDEN)
+
+        rebel_provinces = Province.objects.filter(nation=nation, is_rebel_occupied=True)
+        return Response(ProvinceSerializer(rebel_provinces, many=True, context={"request": request}).data)
 
 
 class AirZoneListView(generics.ListAPIView):

@@ -43,6 +43,7 @@ Read the relevant system doc in `docs/systems/` before modifying a system.
 13. [Trade](docs/systems/trade_system.md) — Dijkstra routes, capacity pools, in-flight transit
 14. [Bureaucratic Capacity](docs/systems/bureaucratic_capacity_system.md) — building supply, policy consumption gates, gov/trait multipliers, deficit penalties
 15. [Whitespace](docs/systems/whitespace_system.md) — unclaimed province simulation, de-integration, cross-provincial ideology melding, game-start init, population formula rework (relief/vegetation/temperature modifiers)
+16. [Control & Rebellion](docs/systems/control_rebellion_system.md) — per-province control (1–100%), Regions, production bonus/national flow trade-off, rebellion trigger/timer/outcomes, ideology interactions, whitespace rebel spawning
 
 **Balance philosophy** — calibrated constants, food economy, industrialisation arc → [`docs/balance_philosophy.md`](docs/balance_philosophy.md)
 
@@ -88,9 +89,9 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "
 
 | App | Migrations |
 |-----|-----------|
-| economy | 0001_initial → 0006_remove_tradeoffer |
-| nations | 0001_initial → 0004_add_capital_province |
-| provinces | 0001_initial → 0012_deintegration_fields |
+| economy | 0001_initial → 0007_control_pool_snapshot |
+| nations | 0001_initial → 0005_region_and_control |
+| provinces | 0001_initial → 0013_region_and_control |
 | espionage | 0001_create_espionage_models |
 | trade | 0001_create_traderoute_capitalrelocation |
 | All others | 0001_initial |

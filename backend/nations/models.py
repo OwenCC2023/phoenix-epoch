@@ -4,7 +4,15 @@ from django.db import models
 
 class Nation(models.Model):
     game = models.ForeignKey("games.Game", on_delete=models.CASCADE, related_name="nations")
-    player = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="nations")
+    # Nullable to support NPC nations created by rebellion independence outcomes.
+    player = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="nations",
+    )
+    is_npc = models.BooleanField(default=False)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     # Five-component government system. Each field holds a key from the

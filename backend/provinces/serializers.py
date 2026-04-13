@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from .models import (
     AirZone, Building, Formation, MilitaryGroup, MilitaryUnit,
-    Province, ProvinceResources, ProvinceSectorAllocation, RiverZone, SeaZone,
+    Province, ProvinceResources, ProvinceSectorAllocation, Region, RiverZone, SeaZone,
 )
 
 
@@ -152,6 +152,12 @@ class ProvinceSerializer(serializers.ModelSerializer):
             "created_at",
             "resources",
             "buildings",
+            # Control & Rebellion System fields
+            "control",
+            "region",
+            "is_rebel_occupied",
+            "rebel_timer_start_turn",
+            "rebel_timer_duration",
         ]
 
 
@@ -263,3 +269,44 @@ class ProvinceSectorAllocationBulkSerializer(serializers.Serializer):
             )
 
         return value
+
+
+class RegionSerializer(serializers.ModelSerializer):
+    """Serializer for Region model — province groupings with shared control."""
+
+    province_ids = serializers.PrimaryKeyRelatedField(
+        source="provinces", many=True, read_only=True
+    )
+
+    class Meta:
+        model = Region
+        fields = ["id", "nation", "name", "control", "province_ids", "created_at"]
+        read_only_fields = ["id", "nation", "created_at"]
+
+    def validate_control(self, value):
+        if value < 1.0 or value > 100.0:
+            raise serializers.ValidationError("Control must be between 1 and 100.")
+        return value
+
+
+class ControlPoolSnapshotSerializer(serializers.ModelSerializer):
+    """Read-only snapshot of control-retained vs. national-flow per turn."""
+
+    class Meta:
+        from economy.models import ControlPoolSnapshot as _ControlPoolSnapshot
+        model = _ControlPoolSnapshot
+        fields = [
+            "id",
+            "province",
+            "region",
+            "turn_number",
+            "tax_revenue_total",
+            "tax_revenue_retained",
+            "trade_capacity_total",
+            "trade_capacity_retained",
+            "bc_total",
+            "bc_retained",
+            "research_total",
+            "research_retained",
+        ]
+        read_only_fields = fields

@@ -2,7 +2,8 @@ from rest_framework import serializers
 
 from .models import (
     AirZone, Building, Formation, MilitaryGroup, MilitaryUnit,
-    Province, ProvinceResources, ProvinceSectorAllocation, Region, RiverZone, SeaZone,
+    Province, ProvinceDevelopmentPoints, ProvinceResources, ProvinceSectorAllocation,
+    Region, RiverZone, SeaZone,
 )
 
 
@@ -10,6 +11,12 @@ class ProvinceResourcesSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProvinceResources
         fields = "__all__"
+
+
+class ProvinceDevelopmentPointsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProvinceDevelopmentPoints
+        fields = ["category", "points"]
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -69,6 +76,7 @@ class RiverZoneSerializer(serializers.ModelSerializer):
 class ProvinceSerializer(serializers.ModelSerializer):
     resources = ProvinceResourcesSerializer(read_only=True)
     buildings = BuildingSerializer(many=True, read_only=True)
+    development_points = ProvinceDevelopmentPointsSerializer(many=True, read_only=True)
     adjacent_province_ids = serializers.PrimaryKeyRelatedField(
         source="adjacent_provinces", many=True, read_only=True
     )
@@ -158,6 +166,7 @@ class ProvinceSerializer(serializers.ModelSerializer):
             "is_rebel_occupied",
             "rebel_timer_start_turn",
             "rebel_timer_duration",
+            "development_points",
         ]
 
 

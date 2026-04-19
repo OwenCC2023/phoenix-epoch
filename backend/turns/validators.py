@@ -25,6 +25,8 @@ def validate_order(order):
         "create_trade_route": _validate_create_trade_route,
         "cancel_trade_route": _validate_cancel_trade_route,
         "designate_capital": _validate_designate_capital,
+        "allocate_dp": _validate_allocate_dp,
+        "transfer_dp": _validate_transfer_dp,
     }
 
     validator = validators.get(order.order_type)
@@ -1205,4 +1207,152 @@ def _validate_designate_capital(order):
         return errors
 
     errors.extend(validate_capital_relocation(order.nation, province, pool))
+    return errors
+
+
+def _validate_allocate_dp(order):
+    """Validate the annual DP allocation order.
+
+    Payload:
+    {
+        "provincial": [{"province_id": int, "category": str, "amount": int}, ...],
+        "military":   [{"category": str, "amount": int}, ...],
+        "expansion":  int   # number of expansion slots purchased (optional, default 0)
+    }
+
+    Total DP spent must not exceed the nation's available pool.
+    """
+    from nations.models import NationDPPool
+    from provinces.models import Province, ProvinceDevelopmentPoints
+    from economy.dp_constants import DP_ALL_CATEGORIES, MILITARY_DP_CATEGORIES, DP_MILITARY_COST_RATIO, DP_EXPANSION_COST, DP_TRANSFER_COST_RATIO
+
+    errors = []
+    payload = order.payload
+
+    provincial_entries = payload.get("provincial", [])
+    military_entries = payload.get("military", [])
+    expansion = payload.get("expansion", 0)
+
+    if not isinstance(provincial_entries, list):
+        errors.append("'provincial' must be a list")
+        return errors
+    if not isinstance(military_entries, list):
+        errors.append("'military' must be a list")
+        return errors
+    if not isinstance(expansion, int) or expansion < 0:
+        errors.append("'expansion' must be a non-negative integer")
+        return errors
+
+    # Validate provincial entries
+    nation_province_ids = set(
+        Province.objects.filter(nation=order.nation).values_list("id", flat=True)
+    )
+    for i, entry in enumerate(provincial_entries):
+        if not isinstance(entry, dict):
+            errors.append(f"provincial[{i}]: must be an object")
+            continue
+        pid = entry.get("province_id")
+        cat = entry.get("category")
+        amt = entry.get("amount")
+        if not isinstance(pid, int):
+            errors.append(f"provincial[{i}]: 'province_id' must be an integer")
+            continue
+        if pid not in nation_province_ids:
+            errors.append(f"provincial[{i}]: province {pid} not owned by this nation")
+            continue
+        if cat not in DP_ALL_CATEGORIES:
+            errors.append(f"provincial[{i}]: invalid category '{cat}'")
+        if not isinstance(amt, int) or amt < 1:
+            errors.append(f"provincial[{i}]: 'amount' must be a positive integer")
+
+    # Validate military entries
+    for i, entry in enumerate(military_entries):
+        if not isinstance(entry, dict):
+            errors.append(f"military[{i}]: must be an object")
+            continue
+        cat = entry.get("category")
+        amt = entry.get("amount")
+        if cat not in MILITARY_DP_CATEGORIES:
+            errors.append(f"military[{i}]: invalid category '{cat}'")
+        if not isinstance(amt, int) or amt < 1:
+            errors.append(f"military[{i}]: 'amount' must be a positive integer")
+
+    if errors:
+        return errors
+
+    # Check total cost against pool
+    try:
+        pool = NationDPPool.objects.get(nation=order.nation)
+    except NationDPPool.DoesNotExist:
+        errors.append("Nation DP pool not initialised")
+        return errors
+
+    provincial_cost = sum(e.get("amount", 0) for e in provincial_entries)
+    military_cost = sum(e.get("amount", 0) * DP_MILITARY_COST_RATIO for e in military_entries)
+    expansion_cost = expansion * DP_EXPANSION_COST
+    total_cost = provincial_cost + military_cost + expansion_cost
+
+    if total_cost > pool.available_points:
+        errors.append(
+            f"Insufficient DP: need {total_cost}, have {pool.available_points}"
+        )
+
+    return errors
+
+
+def _validate_transfer_dp(order):
+    """Validate an inter-category DP transfer within a province.
+
+    Payload:
+    {
+        "province_id":     int,
+        "source_category": str,
+        "target_category": str,
+        "amount":          int   # amount to gain in target; costs 2× from source
+    }
+    """
+    from provinces.models import Province, ProvinceDevelopmentPoints
+    from economy.dp_constants import DP_ALL_CATEGORIES, DP_TRANSFER_COST_RATIO
+
+    errors = []
+    payload = order.payload
+
+    province_id = payload.get("province_id")
+    source = payload.get("source_category")
+    target = payload.get("target_category")
+    amount = payload.get("amount")
+
+    if not isinstance(province_id, int):
+        errors.append("'province_id' must be an integer")
+        return errors
+    if not isinstance(amount, int) or amount < 1:
+        errors.append("'amount' must be a positive integer")
+        return errors
+
+    try:
+        province = Province.objects.get(pk=province_id, nation=order.nation)
+    except Province.DoesNotExist:
+        errors.append("Province not found or not owned by this nation")
+        return errors
+
+    if source not in DP_ALL_CATEGORIES:
+        errors.append(f"Invalid source_category '{source}'")
+    if target not in DP_ALL_CATEGORIES:
+        errors.append(f"Invalid target_category '{target}'")
+    if source == target:
+        errors.append("source_category and target_category must be different")
+
+    if errors:
+        return errors
+
+    cost = amount * DP_TRANSFER_COST_RATIO
+    try:
+        source_row = ProvinceDevelopmentPoints.objects.get(province=province, category=source)
+        if source_row.points < cost:
+            errors.append(
+                f"Insufficient DP in '{source}': need {cost}, have {source_row.points}"
+            )
+    except ProvinceDevelopmentPoints.DoesNotExist:
+        errors.append(f"No DP row found for category '{source}' in this province")
+
     return errors

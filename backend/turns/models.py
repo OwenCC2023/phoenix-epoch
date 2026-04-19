@@ -47,6 +47,8 @@ class Order(models.Model):
         CREATE_TRADE_ROUTE = "create_trade_route"
         CANCEL_TRADE_ROUTE = "cancel_trade_route"
         DESIGNATE_CAPITAL = "designate_capital"
+        ALLOCATE_DP = "allocate_dp"
+        TRANSFER_DP = "transfer_dp"
 
     class Status(models.TextChoices):
         DRAFT = "draft"

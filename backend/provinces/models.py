@@ -407,3 +407,29 @@ class MilitaryUnit(models.Model):
 
     def __str__(self):
         return f"{self.quantity}× {self.unit_type} in {self.formation}"
+
+
+class ProvinceDevelopmentPoints(models.Model):
+    """
+    Development Points (DP) for a province in a specific building category.
+
+    One row per (province, category). DP provides a multiplicative bonus to
+    the final output of buildings in that category — a multiplier of multipliers
+    applied after all other efficiency bonuses (System 17).
+
+    The 'category' field matches a building category key from BUILDING_TYPES
+    (e.g. 'heavy_manufacturing', 'farming') or the special value 'subsistence'.
+    """
+
+    province = models.ForeignKey(
+        Province, on_delete=models.CASCADE, related_name="development_points"
+    )
+    # Building category or "subsistence". max_length=30 fits "government_organization".
+    category = models.CharField(max_length=30)
+    points = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("province", "category")
+
+    def __str__(self):
+        return f"{self.province} – {self.category}: {self.points} DP"

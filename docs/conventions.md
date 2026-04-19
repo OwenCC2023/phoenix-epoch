@@ -22,3 +22,15 @@ Pure Python — dicts, frozensets, and numeric constants only. No imports from D
 ## Migrations
 
 Always run `makemigrations <appname> --name descriptive_name` when adding model fields. Update the migrations status table in `CLAUDE.md` after each new migration.
+
+## Simulation multiplier stacking
+
+Building output formula in `economy/building_simulation.py`:
+
+```
+produce = amount × effective_capacity × designation_mult × efficiency_mult × productivity_mult
+```
+
+- `efficiency_mult` combines gov/traits/GM modifiers + colocation + concentration (all additive-then-multiplicative)
+- **Development Points (System 17)** apply as a final multiplicative layer *after* `produce` is computed — a true multiplier of multipliers. Integration point: `economy/building_simulation.py` after the `produce` line, inside the `output_goods` loop.
+- Subsistence DP applied in `economy/simulation.py` Step 3, after all other subsistence modifiers.

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .helpers import apply_government_modifiers, create_default_policies
-from .models import Nation, NationModifier, NationPolicy
+from .models import Nation, NationDPPool, NationMilitaryDP, NationModifier, NationPolicy
 from .trait_constants import validate_trait_selection
 
 
@@ -19,9 +19,39 @@ class NationPolicySerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "changed_turn"]
 
 
+class NationDPPoolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NationDPPool
+        fields = ["available_points", "last_grant_turn"]
+
+
+class NationMilitaryDPSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NationMilitaryDP
+        fields = ["category", "points"]
+
+
 class NationSerializer(serializers.ModelSerializer):
     modifiers = NationModifierSerializer(many=True, read_only=True)
     policies = NationPolicySerializer(many=True, read_only=True)
+    dp_pool = NationDPPoolSerializer(read_only=True)
+    military_dp = NationMilitaryDPSerializer(many=True, read_only=True)
+    provincial_dp_summary = serializers.SerializerMethodField()
+
+    def get_provincial_dp_summary(self, nation):
+        """Sum of all provincial DP per category across this nation's provinces.
+
+        Display only — no mechanical effect. Returns {category: total_points}.
+        """
+        from provinces.models import ProvinceDevelopmentPoints
+        from django.db.models import Sum
+        rows = (
+            ProvinceDevelopmentPoints.objects
+            .filter(province__nation=nation)
+            .values("category")
+            .annotate(total=Sum("points"))
+        )
+        return {row["category"]: row["total"] for row in rows}
 
     class Meta:
         model = Nation
@@ -42,6 +72,9 @@ class NationSerializer(serializers.ModelSerializer):
             "created_at",
             "modifiers",
             "policies",
+            "dp_pool",
+            "military_dp",
+            "provincial_dp_summary",
         ]
         read_only_fields = ["id", "game", "player", "is_alive", "created_at"]
 

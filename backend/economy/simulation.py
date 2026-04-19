@@ -275,6 +275,17 @@ def simulate_nation_economy(nation, turn_number):
     from nations.models import NationPolicy
     active_policies = {p.category: p.current_level for p in NationPolicy.objects.filter(nation=nation)}
 
+    # Pre-compute DP multipliers per province per building category (System 17).
+    from provinces.models import ProvinceDevelopmentPoints
+    from .dp import compute_province_dp_multipliers
+    province_dp_data = {}  # province_id -> {category: dp_value}
+    for dp_row in ProvinceDevelopmentPoints.objects.filter(province__in=provinces):
+        province_dp_data.setdefault(dp_row.province_id, {})[dp_row.category] = dp_row.points
+    province_dp_multipliers = {
+        pid: compute_province_dp_multipliers(dp_dict)
+        for pid, dp_dict in province_dp_data.items()
+    }
+
     for province in provinces:
         # ----------------------------------------------------------------
         # Step 1: Determine employment split via job system
@@ -337,6 +348,11 @@ def simulate_nation_economy(nation, turn_number):
         # Apply trait research modifier
         if primary == "research" and research_mod_from_traits:
             raw_production["research"] = round(raw_production["research"] * (1.0 + research_mod_from_traits), 2)
+
+        # Apply subsistence DP multiplier (System 17 — multiplier of multipliers)
+        sub_dp_mult = province_dp_multipliers.get(province.id, {}).get("subsistence", 1.0)
+        if sub_dp_mult != 1.0:
+            raw_production[primary] = round(raw_production[primary] * sub_dp_mult, 2)
 
         raw_production["manpower"] = round(
             province.population * MANPOWER_PER_POP * desg_mods.get("manpower", 1.0)
@@ -697,6 +713,7 @@ def simulate_nation_economy(nation, turn_number):
         rationing_level=rationing_level,
         unit_needs=unit_upkeep_needs,
         worker_productivity=worker_productivity,
+        province_dp_multipliers=province_dp_multipliers,
     )
 
     # Step 16: Consumer goods consumption (shortage → stability penalty)
@@ -723,7 +740,8 @@ def simulate_nation_economy(nation, turn_number):
     # Step 18.5: ControlPoolSnapshot — informational record of retained vs. national flow.
     _persist_control_pool_snapshots(provinces, nation, turn_number, integration_modifier)
 
-
+    # Step 19: Annual DP grant (System 17)
+    _grant_annual_dp(nation, turn_number)
 
 
 def _persist_control_pool_snapshots(provinces, nation, turn_number: int, integration_modifier: float) -> None:
@@ -805,6 +823,22 @@ def _persist_control_pool_snapshots(provinces, nation, turn_number: int, integra
         ))
 
     ControlPoolSnapshot.objects.bulk_create(province_rows + region_rows)
+
+
+def _grant_annual_dp(nation, current_turn):
+    """Grant DP_ANNUAL_GRANT points every DP_GRANT_INTERVAL turns."""
+    from nations.models import NationDPPool
+    from .dp_constants import DP_ANNUAL_GRANT, DP_GRANT_INTERVAL
+
+    if current_turn < 1 or current_turn % DP_GRANT_INTERVAL != 0:
+        return
+
+    pool, _ = NationDPPool.objects.get_or_create(
+        nation=nation, defaults={"available_points": 0, "last_grant_turn": 0}
+    )
+    pool.available_points += DP_ANNUAL_GRANT
+    pool.last_grant_turn = current_turn
+    pool.save(update_fields=["available_points", "last_grant_turn"])
 
 
 def _apply_military_upkeep(nation, provinces, trait_effects):

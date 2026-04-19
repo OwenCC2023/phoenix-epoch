@@ -1,0 +1,37 @@
+Development Points System:
+
+Main Goal: Quantify the growing efficiency of persistent systems over time.
+
+General Principles:
+	- Referred to as DP
+	- Non-military DP are Province Based.
+	- Military DP are National Only
+	- Three Categories of DP: Economic, Government, Military.
+	- Randomly assigned at game start, with a preference based on province-type bonuses.
+	- No cap, but diminishing returns. 
+	- One point-category for each building-sector category EXCEPT ALL MILITARY. 
+	- An additional point-category for subsistence.
+	- National non-military DP are a sum of all provincial DP and have no mechanical effect - but should be displayed on the National Summary page of the browser-view.
+
+Mechanics:
+	- Multiplicative on sector-specific buildings (and province resource production).
+	- Multiplier is a logarithmic function needs to intake a whole number greater than or equal to zero and output a number that approaches a limit of 2 at infinity.
+	- Multiplier applies multiplicatively to the final output of the sector in the given province.
+		! Note this in the Claude.md documentation for this system. This multiplication technique is different than the other systems and more powerful, acting as a multiplier of other multipliers.
+	- When a province has more than 50% of its DP in a single sector, the DP-based effects for that sector are multiplied by 1+(([Sector DP]-([Total Provincial DP]/2))/50) but, all other sectors in that province get a 1-(([Sector DP]-([Total Provincial DP]/2))/10) multiplier.
+	- DP can be moved from one category to another at a 2:1 cost.
+
+Tie-ins with Other Systems:
+	- Buildings:
+		- Multiplies outputs of entire categories multiplier.
+	- Military:
+		- Three DP categories per branch: Strategy, Tactics, and Logistics.
+		- Strategy DPs unlock more Doctrines within the Doctrine System (new stub).
+		- Tactics DPs unlock more sophisticated tactics within the Combat System (stubbed).
+		- Logistics DPs unlock the capacity for more Formations and Groups.
+		- Logistics DP unlock greater supply statuses for Units.
+
+Start of the Game:
+	- Each province gets a randomized number of DP between 100 and 200.
+	- DP is then distributed across the building-categories randomly with a preference based on province-type bonuses. Use the SECTOR_BUILDING_CATEGORY_MAP in backend/provinces/constants.py for which categories to prefer.
+	- Subsistence DP starts as a random number between 20 and 40.

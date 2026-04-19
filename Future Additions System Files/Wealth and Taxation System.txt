@@ -1,0 +1,3 @@
+Wealth and Taxation System
+
+Main Goal: Create a quantitative measurement of the capabilities of a nation in aggregate, and the proportion of those capabilities available to the state.

@@ -1,0 +1,3 @@
+Occupation System
+
+Main Goal: Define how provinces that belong to one nation but are militarily controlled by another nation behave.

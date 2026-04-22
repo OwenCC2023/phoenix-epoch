@@ -1,0 +1,5 @@
+Diplomacy System
+
+Main Goal: Systematize the mechanical aspects of most treaties.
+
+Treaty Types:

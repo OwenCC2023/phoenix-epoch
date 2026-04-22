@@ -13,7 +13,7 @@ General Principles:
 	- Provinces all start the game with randomly assigned ideologies. Those that are part of the starting territory of a nation get the provincial ideologies overridden at game start by the national ideologies.
 
 Components:
-	- Conversion back to whitespace works like the Provincial Integration System's Normalization function, but in reverse.
+	- Conversion back to whitespace works like the Provincial Integration System, but in reverse.
 	- Cross-Provincial Ideological Melding where nearby ideologies influence each other. Higher-pop provinces exert more ideological pressure on low-pop provinces.
 	- Whitespace provinces have populations (assumed stable at the randomly-determined level appropriate for the province type).
 	- Whitespace populations can migrate (stub for inclusion in International Migration System).

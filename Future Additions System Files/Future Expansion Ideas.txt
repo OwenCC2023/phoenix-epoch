@@ -1,9 +1,11 @@
 Future Expansion Ideas:
+	- Regional Taxation
 	- Regional Policies
 	- Regional Ideologies
-	- Regional Trade
+	- Regional International Trade
 	- Regional Militaries
-		- Regional Military DP: Institute as provincial DP and have province-specific units?
+	- Regional Military DP (?): Institute as provincial DP and have province-specific units?
+	- Inter-regional trade within Nations
 
 	- Playable multi-national corporations.
 	- Playable religious organizations.
@@ -12,7 +14,8 @@ Future Expansion Ideas:
 	- Mechs/Walkers, Airships, Living Ships/Krakens.
 
 	- Electricity System
-	- Internal Logistics System
 	- Water Scarcity System
+	- Provincial resources prices
+	- Internal trades between provinces
 
 	- Role-based gameplay from Phoenix-Epoch: Megagame.

@@ -60,6 +60,7 @@ TERRAIN_TYPES = {
         "description": "Rich in minerals, difficult to farm.",
         "multipliers": {
             "agriculture": 0.5,
+            "extraction": 1.7,
             "industry": 1.5,
             "energy": 1.2,
             "commerce": 0.7,
@@ -144,11 +145,26 @@ TERRAIN_TYPES = {
 # Sector to resource mapping
 SECTOR_RESOURCE_MAP = {
     "agriculture": "food",
+    "extraction": "materials",
     "industry": "materials",
     "energy": "energy",
     "commerce": "wealth",
     "military": "manpower",
     "research": "research",
+}
+
+# Maps terrain sectors to their associated building categories.
+# Used to determine which building efficiency bonuses are relevant
+# to a province's primary production sector.
+# Categories not listed (entertainment, religious, government_regulatory) are unmapped.
+SECTOR_BUILDING_CATEGORY_MAP = {
+    "agriculture": ["farming"],
+    "extraction": ["extraction"],
+    "industry":   ["heavy_manufacturing", "light_manufacturing", "chemical", "construction"],
+    "energy":     ["green_energy", "refining"],
+    "commerce":   ["financial", "transport", "communications"],
+    "military":   [],
+    "research":   ["pharmaceutical", "healthcare"],
 }
 
 # Default sector allocation for new provinces

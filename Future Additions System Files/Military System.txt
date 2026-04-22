@@ -1,3 +1,10 @@
 Military System
 
 Main Goal: Simulate the ability of a nation to build and maintain a military of diverse unit types, capabilities, and quality levels.
+
+- Military DP Categories:
+		- Three DP categories per branch: Strategy, Tactics, and Logistics.
+		- Strategy DPs unlock more Doctrines within the Doctrine System (new stub).
+		- Tactics DPs unlock more sophisticated tactics within the Combat System (stubbed).
+		- Logistics DPs unlock the capacity for more Formations and Groups.
+		- Logistics DP unlock greater supply statuses for Units.

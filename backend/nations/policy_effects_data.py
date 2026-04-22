@@ -1385,8 +1385,8 @@ POLICY_EFFECTS = {
         1: {
             "base": {
                 'building_efficiency': {
-                    'heavy_manufacturing': -0.01,
-                    'light_manufacturing': -0.01,
+                    'heavy_manufacturing': 0.1,
+                    'light_manufacturing': 0.1,
                 },
                 'upkeep_reduction': 0.01,
             },
@@ -1394,21 +1394,21 @@ POLICY_EFFECTS = {
         2: {
             "base": {
                 'building_efficiency': {
-                    'heavy_manufacturing': 0.02,
-                    'light_manufacturing': 0.02,
+                    'heavy_manufacturing': 0.2,
+                    'light_manufacturing': 0.2,
                 },
-                'production_materials_pct': 0.01,
+                'production_materials_pct': 0.1,
                 'upkeep_reduction': -0.02,
             },
         },
         3: {
             "base": {
                 'building_efficiency': {
-                    'heavy_manufacturing': 0.04,
-                    'light_manufacturing': 0.04,
+                    'heavy_manufacturing': 0.4,
+                    'light_manufacturing': 0.4,
                 },
                 'corruption_resistance': -0.02,
-                'production_materials_pct': 0.03,
+                'production_materials_pct': 0.3,
                 'upkeep_reduction': -0.04,
             },
         },
@@ -1418,8 +1418,8 @@ POLICY_EFFECTS = {
         1: {
             "base": {
                 'building_efficiency': {
-                    'extraction': -0.01,
-                    'refining': -0.01,
+                    'extraction': 0.1,
+                    'refining': 0.1,
                 },
                 'upkeep_reduction': 0.01,
             },
@@ -1427,21 +1427,21 @@ POLICY_EFFECTS = {
         2: {
             "base": {
                 'building_efficiency': {
-                    'extraction': 0.02,
-                    'refining': 0.02,
+                    'extraction': 0.2,
+                    'refining': 0.2,
                 },
-                'production_energy_pct': 0.01,
+                'production_energy_pct': 0.1,
                 'upkeep_reduction': -0.02,
             },
         },
         3: {
             "base": {
                 'building_efficiency': {
-                    'extraction': 0.04,
-                    'refining': 0.04,
+                    'extraction': 0.4,
+                    'refining': 0.4,
                 },
                 'environmental_health': -0.03,
-                'production_energy_pct': 0.03,
+                'production_energy_pct': 0.3,
                 'upkeep_reduction': -0.04,
             },
         },
@@ -1451,30 +1451,30 @@ POLICY_EFFECTS = {
         1: {
             "base": {
                 'building_efficiency': {
-                    'farming': -0.01,
+                    'farming': 0.1,
                 },
-                'food_production_bonus': -0.01,
+                'food_production_bonus': 0.1,
                 'upkeep_reduction': 0.01,
             },
         },
         2: {
             "base": {
                 'building_efficiency': {
-                    'farming': 0.02,
+                    'farming': 0.2,
                 },
-                'farming_bonus': 0.01,
-                'food_production_bonus': 0.02,
+                'farming_bonus': 0.1,
+                'food_production_bonus': 0.2,
                 'upkeep_reduction': -0.02,
             },
         },
         3: {
             "base": {
                 'building_efficiency': {
-                    'farming': 0.04,
+                    'farming': 0.4,
                 },
-                'farming_bonus': 0.03,
-                'food_production_bonus': 0.04,
-                'rural_output_bonus': 0.02,
+                'farming_bonus': 0.3,
+                'food_production_bonus': 0.4,
+                'rural_output_bonus': 0.2,
                 'upkeep_reduction': -0.04,
             },
         },

@@ -44,6 +44,7 @@ Read the relevant system doc in `docs/systems/` before modifying a system.
 14. [Bureaucratic Capacity](docs/systems/bureaucratic_capacity_system.md) — building supply, policy consumption gates, gov/trait multipliers, deficit penalties
 15. [Whitespace](docs/systems/whitespace_system.md) — unclaimed province simulation, de-integration, cross-provincial ideology melding, game-start init, population formula rework (relief/vegetation/temperature modifiers)
 16. [Control & Rebellion](docs/systems/control_rebellion_system.md) — per-province control (1–100%), Regions, production bonus/national flow trade-off, rebellion trigger/timer/outcomes, ideology interactions, whitespace rebel spawning
+17. [Development Points](docs/systems/development_points_system.md) — per-province, per-building-category DP; logarithmic multiplier approaching 2×; concentration bonus/penalty; 40 DP/year annual grant; ALLOCATE_DP and TRANSFER_DP orders; military DP stub
 
 **Balance philosophy** — calibrated constants, food economy, industrialisation arc → [`docs/balance_philosophy.md`](docs/balance_philosophy.md)
 
@@ -78,7 +79,7 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe mana
 DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe manage.py makemigrations
 
 # Import smoke test
-DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "import django; django.setup(); from economy.simulation import simulate_nation_economy; from trade.simulation import recompute_route_paths; from nations.bureaucratic_capacity import compute_bureaucratic_supply; print('OK')"
+DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "import django; django.setup(); from economy.simulation import simulate_nation_economy; from trade.simulation import recompute_route_paths; from nations.bureaucratic_capacity import compute_bureaucratic_supply; from economy.dp import compute_dp_multiplier; from economy.dp_init import initialize_province_dp; print('OK')"
 ```
 
 **Note:** Use `./venv/Scripts/python.exe` (not `python` — Windows Store intercept). Always set `DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev`.
@@ -90,13 +91,25 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "
 | App | Migrations |
 |-----|-----------|
 | economy | 0001_initial → 0007_control_pool_snapshot |
-| nations | 0001_initial → 0005_region_and_control |
-| provinces | 0001_initial → 0013_region_and_control |
+| nations | 0001_initial → 0006_dp_pool_and_military |
+| provinces | 0001_initial → 0014_development_points |
 | espionage | 0001_create_espionage_models |
 | trade | 0001_create_traderoute_capitalrelocation |
 | All others | 0001_initial |
 
 When adding model fields, always run `makemigrations <appname> --name descriptive_name`.
+
+**Migration numbering:** Always verify against the actual filesystem (`ls backend/<app>/migrations/`). The table above may be ahead of `master` if a feature branch has uncommitted migrations.
+
+---
+
+## Building category gotchas
+
+`SECTOR_BUILDING_CATEGORY_MAP` covers 13 building categories across 6 sectors (agriculture/extraction/industry/energy/commerce/research). These categories are **not mapped** but exist in `BUILDING_TYPES` and need explicit handling in any system that iterates all building categories:
+
+`entertainment`, `religious`, `government_regulatory`, `government_oversight`, `government_management`, `government_security`, `government_education`, `government_organization`, `government_welfare`, `espionage_attack`, `espionage_defense`
+
+Default weight/multiplier to 1.0 for these when distributing by sector.
 
 ---
 

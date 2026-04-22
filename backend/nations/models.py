@@ -111,3 +111,38 @@ class NationModifier(models.Model):
 
     def __str__(self):
         return f"{self.name}: {self.value} on {self.target} ({self.nation})"
+
+
+class NationDPPool(models.Model):
+    """
+    Tracks unspent Development Points available for a nation to allocate.
+
+    Nations receive DP_ANNUAL_GRANT points every DP_GRANT_INTERVAL turns.
+    Players spend from this pool via the ALLOCATE_DP order (System 17).
+    """
+
+    nation = models.OneToOneField(Nation, on_delete=models.CASCADE, related_name="dp_pool")
+    available_points = models.PositiveIntegerField(default=0)
+    last_grant_turn = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.nation.name} DP pool: {self.available_points} available"
+
+
+class NationMilitaryDP(models.Model):
+    """
+    Military Development Points for a nation (stub — stored, no mechanics yet).
+
+    Military DP categories: strategy, tactics, logistics.
+    Future systems (Doctrine, Combat) will consume these values.
+    """
+
+    nation = models.ForeignKey(Nation, on_delete=models.CASCADE, related_name="military_dp")
+    category = models.CharField(max_length=20)  # strategy / tactics / logistics
+    points = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("nation", "category")
+
+    def __str__(self):
+        return f"{self.nation.name} military DP – {self.category}: {self.points}"

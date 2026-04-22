@@ -47,6 +47,8 @@ class TurnResolutionEngine:
             self._execute_policy_changes(turn)
             self._execute_research_unlocks(turn)
             self._execute_allocations(turn)
+            self._execute_dp_allocations(turn)
+            self._execute_dp_transfers(turn)
             self._execute_build_orders(turn)
             self._execute_military_orders(turn)
             self._execute_espionage_orders(turn)
@@ -797,6 +799,146 @@ class TurnResolutionEngine:
                     release_nation_provinces(nation, turn.turn_number)
             except NationResourcePool.DoesNotExist:
                 pass
+
+    def _execute_dp_allocations(self, turn):
+        """Execute annual DP allocation orders (ALLOCATE_DP).
+
+        Deducts from NationDPPool and distributes points to:
+        - ProvinceDevelopmentPoints (provincial allocations)
+        - NationMilitaryDP (military allocations, at 4:1 cost)
+        - Resolution log records expansion slots purchased.
+        """
+        from provinces.models import ProvinceDevelopmentPoints
+        from nations.models import NationDPPool, NationMilitaryDP
+        from economy.dp_constants import DP_MILITARY_COST_RATIO, DP_EXPANSION_COST
+
+        orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.ALLOCATE_DP,
+            status=Order.Status.VALIDATED,
+        )
+
+        for order in orders:
+            payload = order.payload
+            provincial_entries = payload.get("provincial", [])
+            military_entries = payload.get("military", [])
+            expansion = payload.get("expansion", 0)
+
+            try:
+                pool = NationDPPool.objects.get(nation=order.nation)
+            except NationDPPool.DoesNotExist:
+                order.status = Order.Status.FAILED
+                order.save(update_fields=["status"])
+                self._log(f"{order.nation.name}: ALLOCATE_DP failed — no DP pool found")
+                continue
+
+            # Compute total cost
+            provincial_cost = sum(e.get("amount", 0) for e in provincial_entries)
+            military_cost = sum(e.get("amount", 0) * DP_MILITARY_COST_RATIO for e in military_entries)
+            expansion_cost = expansion * DP_EXPANSION_COST
+            total_cost = provincial_cost + military_cost + expansion_cost
+
+            if total_cost > pool.available_points:
+                order.status = Order.Status.FAILED
+                order.save(update_fields=["status"])
+                self._log(
+                    f"{order.nation.name}: ALLOCATE_DP failed — need {total_cost}, "
+                    f"have {pool.available_points}"
+                )
+                continue
+
+            # Apply provincial allocations
+            for entry in provincial_entries:
+                dp_row, _ = ProvinceDevelopmentPoints.objects.get_or_create(
+                    province_id=entry["province_id"],
+                    category=entry["category"],
+                    defaults={"points": 0},
+                )
+                dp_row.points += entry["amount"]
+                dp_row.save(update_fields=["points"])
+
+            # Apply military allocations
+            for entry in military_entries:
+                mil_row, _ = NationMilitaryDP.objects.get_or_create(
+                    nation=order.nation,
+                    category=entry["category"],
+                    defaults={"points": 0},
+                )
+                mil_row.points += entry["amount"]
+                mil_row.save(update_fields=["points"])
+
+            # Deduct from pool
+            pool.available_points -= total_cost
+            pool.save(update_fields=["available_points"])
+
+            order.status = Order.Status.EXECUTED
+            order.save(update_fields=["status"])
+            self._log(
+                f"{order.nation.name}: allocated {provincial_cost} provincial DP, "
+                f"{len(military_entries)} military entries, {expansion} expansion slot(s)"
+            )
+
+    def _execute_dp_transfers(self, turn):
+        """Execute intra-province DP transfer orders (TRANSFER_DP).
+
+        Deducts 2× amount from source category and adds amount to target category.
+        """
+        from provinces.models import ProvinceDevelopmentPoints
+        from economy.dp_constants import DP_TRANSFER_COST_RATIO
+
+        orders = Order.objects.filter(
+            turn=turn,
+            order_type=Order.OrderType.TRANSFER_DP,
+            status=Order.Status.VALIDATED,
+        )
+
+        for order in orders:
+            payload = order.payload
+            province_id = payload["province_id"]
+            source_cat = payload["source_category"]
+            target_cat = payload["target_category"]
+            amount = payload["amount"]
+            cost = amount * DP_TRANSFER_COST_RATIO
+
+            try:
+                source_row = ProvinceDevelopmentPoints.objects.get(
+                    province_id=province_id, category=source_cat
+                )
+            except ProvinceDevelopmentPoints.DoesNotExist:
+                order.status = Order.Status.FAILED
+                order.save(update_fields=["status"])
+                self._log(
+                    f"{order.nation.name}: TRANSFER_DP failed — no DP row for "
+                    f"'{source_cat}' in province {province_id}"
+                )
+                continue
+
+            if source_row.points < cost:
+                order.status = Order.Status.FAILED
+                order.save(update_fields=["status"])
+                self._log(
+                    f"{order.nation.name}: TRANSFER_DP failed — need {cost} in "
+                    f"'{source_cat}', have {source_row.points}"
+                )
+                continue
+
+            target_row, _ = ProvinceDevelopmentPoints.objects.get_or_create(
+                province_id=province_id,
+                category=target_cat,
+                defaults={"points": 0},
+            )
+
+            source_row.points -= cost
+            target_row.points += amount
+            source_row.save(update_fields=["points"])
+            target_row.save(update_fields=["points"])
+
+            order.status = Order.Status.EXECUTED
+            order.save(update_fields=["status"])
+            self._log(
+                f"{order.nation.name}: transferred {amount} DP from '{source_cat}' "
+                f"to '{target_cat}' in province {province_id} (cost {cost})"
+            )
 
     def _create_next_turn(self, current_turn):
         """Create the next turn."""

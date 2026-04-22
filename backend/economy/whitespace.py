@@ -105,6 +105,10 @@ def initialize_whitespace(game) -> None:
             batch_size=500,
         )
 
+    # Initialize Development Points for all provinces and nations (System 17).
+    from economy.dp_init import initialize_province_dp
+    initialize_province_dp(game)
+
 
 # ---------------------------------------------------------------------------
 # Nation collapse — release provinces to whitespace

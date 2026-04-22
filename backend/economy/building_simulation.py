@@ -423,6 +423,7 @@ def compute_rationing_capacities(
 def simulate_building_production(
     nation, provinces, province_job_status, building_efficiency_modifiers,
     rationing_level=0, unit_needs=None, worker_productivity=0.0,
+    province_dp_multipliers=None,
 ):
     """
     Process manufactured-goods production for all buildings in a nation.
@@ -577,8 +578,18 @@ def simulate_building_production(
                 stock_dirty = True
 
         productivity_mult = (1.0 + worker_productivity) * province_happiness_mult.get(province_id, 1.0)
+
+        # DP multiplier (System 17 — multiplier of multipliers, applied after
+        # all other output modifiers). Looks up building category directly as
+        # DP category since they share the same key space.
+        dp_mult = 1.0
+        if province_dp_multipliers:
+            b_cat = BUILDING_TYPES.get(bldg.building_type, {}).get("category", "")
+            if b_cat:
+                dp_mult = province_dp_multipliers.get(province_id, {}).get(b_cat, 1.0)
+
         for good, amount in level_data["output_goods"].items():
-            produce = round(amount * effective_capacity * designation_mult * efficiency_mult * productivity_mult, 4)
+            produce = round(amount * effective_capacity * designation_mult * efficiency_mult * productivity_mult * dp_mult, 4)
             if good in _POOL_RESOURCE_KEYS:
                 setattr(pool, good, round(getattr(pool, good, 0.0) + produce, 4))
                 pool_dirty = True

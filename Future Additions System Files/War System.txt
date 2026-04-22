@@ -1,0 +1,3 @@
+War System
+
+Main Goal: Defines how to tell if combat takes place, where it takes place, under what circumstances, and involving which Groups.

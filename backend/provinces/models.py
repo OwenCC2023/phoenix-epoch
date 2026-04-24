@@ -227,7 +227,7 @@ class ProvinceResources(models.Model):
     food = models.FloatField(default=0)
     materials = models.FloatField(default=0)
     energy = models.FloatField(default=0)
-    wealth = models.FloatField(default=0)
+    kapital = models.FloatField(default=0)
     manpower = models.FloatField(default=0)
     research = models.FloatField(default=0)
     updated_turn = models.PositiveIntegerField(default=0)

@@ -2,7 +2,7 @@
 Literacy system computation.
 
 Province.literacy (0.0–1.0) is updated each turn using an S-curve growth
-formula driven by buildings, security, wealth, and policy state.
+formula driven by buildings, security, kapital, and policy state.
 
 National literacy (mean of province literacies) multiplies research production
 each turn and amplifies happiness deltas.
@@ -10,8 +10,8 @@ each turn and amplifies happiness deltas.
 
 from .literacy_constants import (
     BASE_LITERACY_GROWTH,
-    WEALTH_LITERACY_SCALE,
-    WEALTH_LITERACY_CAP,
+    KAPITAL_LITERACY_SCALE,
+    KAPITAL_LITERACY_CAP,
     POP_GROWTH_DILUTION_THRESHOLD,
     POP_GROWTH_DILUTION_FACTOR,
     CHILD_LABOR_LITERACY_PENALTY,
@@ -32,7 +32,7 @@ def compute_literacy_growth(
     province,
     bldg_effects: dict,
     security: float,
-    wealth_per_cap: float,
+    kapital_per_cap: float,
     pop_growth_rate: float,
     active_policies: dict,
     trait_effects: dict,
@@ -49,8 +49,8 @@ def compute_literacy_growth(
         Uses "literacy_bonus" key.
     security : float
         Province local security (0-100), already computed this turn.
-    wealth_per_cap : float
-        Wealth produced this turn divided by province population.
+    kapital_per_cap : float
+        Kapital produced this turn divided by province population.
     pop_growth_rate : float
         Province population growth rate from last turn (0.0 if first turn).
     active_policies : dict
@@ -84,18 +84,18 @@ def compute_literacy_growth(
     security_mult = get_security_literacy_multiplier(security)
     growth_after_security = growth_after_buildings * security_mult
 
-    # --- Wealth multiplier ---
-    wealth_bonus = min(wealth_per_cap / WEALTH_LITERACY_SCALE, WEALTH_LITERACY_CAP)
-    growth_after_wealth = growth_after_security * (1.0 + wealth_bonus)
+    # --- Kapital multiplier ---
+    kapital_bonus = min(kapital_per_cap / KAPITAL_LITERACY_SCALE, KAPITAL_LITERACY_CAP)
+    growth_after_kapital = growth_after_security * (1.0 + kapital_bonus)
 
     # --- Population growth dilution ---
     # Rapid pop growth dilutes literacy % (more illiterates added than literates).
     if pop_growth_rate > POP_GROWTH_DILUTION_THRESHOLD:
         excess = pop_growth_rate - POP_GROWTH_DILUTION_THRESHOLD
         dilution = excess * 10.0 * POP_GROWTH_DILUTION_FACTOR
-        growth_after_dilution = growth_after_wealth * max(0.0, 1.0 - dilution)
+        growth_after_dilution = growth_after_kapital * max(0.0, 1.0 - dilution)
     else:
-        growth_after_dilution = growth_after_wealth
+        growth_after_dilution = growth_after_kapital
 
     # --- Policy penalties ---
     child_labor_level = active_policies.get("child_labor", 0)

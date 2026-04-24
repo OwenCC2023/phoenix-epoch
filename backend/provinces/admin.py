@@ -40,7 +40,7 @@ class RiverZoneAdmin(admin.ModelAdmin):
 
 @admin.register(ProvinceResources)
 class ProvinceResourcesAdmin(admin.ModelAdmin):
-    list_display = ("province", "food", "materials", "energy", "wealth", "manpower", "research", "updated_turn")
+    list_display = ("province", "food", "materials", "energy", "kapital", "manpower", "research", "updated_turn")
     search_fields = ("province__name",)
 
 

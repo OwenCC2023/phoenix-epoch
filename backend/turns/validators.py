@@ -27,6 +27,11 @@ def validate_order(order):
         "designate_capital": _validate_designate_capital,
         "allocate_dp": _validate_allocate_dp,
         "transfer_dp": _validate_transfer_dp,
+        "set_tax_rate": _validate_set_tax_rate,
+        "set_subsidy": _validate_set_subsidy,
+        "gov_purchase": _validate_gov_purchase,
+        "gov_sell": _validate_gov_sell,
+        "gift_resources": _validate_gift_resources,
     }
 
     validator = validators.get(order.order_type)
@@ -97,7 +102,7 @@ def _validate_trade_offer(order):
     """
     errors = []
     payload = order.payload
-    valid_resources = {"food", "materials", "energy", "wealth", "manpower", "research"}
+    valid_resources = {"food", "materials", "energy", "kapital", "manpower", "research"}
 
     if "to_nation_id" not in payload:
         errors.append("Missing to_nation_id")
@@ -1355,4 +1360,78 @@ def _validate_transfer_dp(order):
     except ProvinceDevelopmentPoints.DoesNotExist:
         errors.append(f"No DP row found for category '{source}' in this province")
 
+    return errors
+
+
+# --- Wealth & Taxation System (System 18) order validators ----------------
+
+def _validate_set_tax_rate(order):
+    """Payload: {"new_rate": float}  where 0 <= new_rate <= 1."""
+    errors = []
+    payload = order.payload
+    new_rate = payload.get("new_rate")
+    if not isinstance(new_rate, (int, float)):
+        errors.append("new_rate must be a number")
+    elif not (0.0 <= float(new_rate) <= 1.0):
+        errors.append(f"new_rate must be in [0.0, 1.0], got {new_rate}")
+    return errors
+
+
+def _validate_set_subsidy(order):
+    """Payload: {"sector": str, "rate": float}  where 0 <= rate <= 1.
+    Setting rate=0 removes the subsidy.
+    """
+    from economy.pricing_constants import SUBSIDY_SECTOR_MAP
+    errors = []
+    payload = order.payload
+    sector = payload.get("sector")
+    rate = payload.get("rate")
+    if sector not in SUBSIDY_SECTOR_MAP:
+        valid = ", ".join(SUBSIDY_SECTOR_MAP.keys())
+        errors.append(f"Invalid sector '{sector}'. Choose from: {valid}")
+    if not isinstance(rate, (int, float)):
+        errors.append("rate must be a number")
+    elif not (0.0 <= float(rate) <= 1.0):
+        errors.append(f"rate must be in [0.0, 1.0], got {rate}")
+    return errors
+
+
+def _validate_gov_purchase(order):
+    """Payload: {"good": str, "qty": float}."""
+    errors = []
+    payload = order.payload
+    good = payload.get("good")
+    qty = payload.get("qty")
+    if not isinstance(good, str) or not good:
+        errors.append("good must be a non-empty string")
+    if not isinstance(qty, (int, float)) or float(qty) <= 0:
+        errors.append("qty must be a positive number")
+    return errors
+
+
+def _validate_gov_sell(order):
+    """Payload: {"good": str, "qty": float}."""
+    return _validate_gov_purchase(order)
+
+
+def _validate_gift_resources(order):
+    """Payload: {"to_nation_id": int, "goods": {good_key: qty}}."""
+    from nations.models import Nation
+    errors = []
+    payload = order.payload
+    to_id = payload.get("to_nation_id")
+    goods = payload.get("goods", {})
+    if not isinstance(to_id, int):
+        errors.append("to_nation_id must be an integer")
+    else:
+        if not Nation.objects.filter(pk=to_id).exists():
+            errors.append("Recipient nation not found")
+        elif to_id == order.nation_id:
+            errors.append("Cannot gift to self")
+    if not isinstance(goods, dict) or not goods:
+        errors.append("goods must be a non-empty object")
+    else:
+        for k, v in goods.items():
+            if not isinstance(v, (int, float)) or float(v) <= 0:
+                errors.append(f"goods[{k}] must be a positive number")
     return errors

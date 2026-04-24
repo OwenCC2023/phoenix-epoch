@@ -141,8 +141,8 @@ TRAIT_DEFS = {
             "stability_bonus": -2.0,
             "trade_pct": 0.05,
             "upkeep_reduction": 0.12,
-            "wealth_production_bonus": 0.08,
-            "production_wealth_pct": 0.06,
+            "kapital_production_bonus": 0.08,
+            "production_kapital_pct": 0.06,
             "corruption_resistance": 0.03,
             "bureaucratic_capacity_malus": -0.15,
         },
@@ -150,7 +150,7 @@ TRAIT_DEFS = {
             "stability_bonus": -1.0,
             "trade_pct": 0.03,
             "upkeep_reduction": 0.06,
-            "wealth_production_bonus": 0.04,
+            "kapital_production_bonus": 0.04,
             "bureaucratic_capacity_malus": -0.08,
         },
     },
@@ -238,6 +238,7 @@ TRAIT_DEFS = {
             "diplomatic_reputation_penalty": -0.15,
             "corruption_resistance": -0.05,
             "security_multiplier": 0.8,
+            "tax_efficiency": -0.09,
         },
         "weak_effects": {
             "espionage_bonus": 0.12,
@@ -245,6 +246,7 @@ TRAIT_DEFS = {
             "diplomatic_reputation_penalty": -0.08,
             "corruption_resistance": -0.02,
             "security_multiplier": 0.9,
+            "tax_efficiency": -0.045,
         },
     },
     "honorable": {
@@ -257,12 +259,14 @@ TRAIT_DEFS = {
             "diplomatic_reputation_bonus": 0.15,
             "corruption_resistance": 0.04,
             "security_multiplier": 1.8,
+            "tax_efficiency": 0.09,
         },
         "weak_effects": {
             "stability_bonus": 1.0,
             "diplomatic_reputation_bonus": 0.08,
             "corruption_resistance": 0.02,
             "security_multiplier": 1.4,
+            "tax_efficiency": 0.045,
         },
     },
 
@@ -296,7 +300,7 @@ TRAIT_DEFS = {
         "strong_effects": {
             "growth_rate": -0.001,
             "research_bonus": 0.12,
-            "wealth_production_bonus": 0.06,
+            "kapital_production_bonus": 0.06,
             "building_efficiency_bonus": {
                 "financial": 0.08,
                 "light_manufacturing": 0.06,
@@ -304,7 +308,7 @@ TRAIT_DEFS = {
         },
         "weak_effects": {
             "research_bonus": 0.06,
-            "wealth_production_bonus": 0.03,
+            "kapital_production_bonus": 0.03,
             "building_efficiency_bonus": {
                 "financial": 0.04,
             },
@@ -325,6 +329,7 @@ TRAIT_DEFS = {
                 "construction": 0.06,
                 "government_welfare": 0.03,
             },
+            "tax_efficiency": 0.06,
         },
         "weak_effects": {
             "integration_pct": 0.03,
@@ -333,6 +338,7 @@ TRAIT_DEFS = {
             "building_efficiency_bonus": {
                 "farming": 0.03,
             },
+            "tax_efficiency": 0.03,
         },
     },
     "individualist": {
@@ -341,19 +347,21 @@ TRAIT_DEFS = {
         "pair_index": 6,
         "strong_effects": {
             "stability_bonus": -1.0,
-            "wealth_production_bonus": 0.10,
-            "production_wealth_pct": 0.06,
+            "kapital_production_bonus": 0.10,
+            "production_kapital_pct": 0.06,
             "building_efficiency_bonus": {
                 "financial": 0.08,
                 "entertainment": 0.06,
             },
+            "tax_efficiency": -0.06,
         },
         "weak_effects": {
-            "wealth_production_bonus": 0.05,
-            "production_wealth_pct": 0.03,
+            "kapital_production_bonus": 0.05,
+            "production_kapital_pct": 0.03,
             "building_efficiency_bonus": {
                 "financial": 0.04,
             },
+            "tax_efficiency": -0.03,
         },
     },
 

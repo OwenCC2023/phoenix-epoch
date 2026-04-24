@@ -170,6 +170,15 @@ def start_normalization(province, nation, current_turn: int) -> None:
     nation, or randomly assigned for unclaimed provinces).
     """
     from .control import get_province_control
+    # Wealth & Taxation: estate tax applies at point of acquisition, before reassignment.
+    try:
+        from .pricing import compute_turn_start_prices
+        from .taxation import collect_estate_tax
+        prices = compute_turn_start_prices(nation)["prices"]
+        collect_estate_tax(nation, province, prices)
+    except Exception:
+        pass
+
     province.nation = nation
     province.is_core = False
     province.normalization_started_turn = current_turn

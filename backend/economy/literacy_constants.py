@@ -19,14 +19,14 @@ Calibration:
 BASE_LITERACY_GROWTH = 0.005
 
 # ---------------------------------------------------------------------------
-# Wealth contribution to literacy growth
+# Kapital contribution to literacy growth
 # ---------------------------------------------------------------------------
 
-# Wealth per capita at which the wealth bonus is 100% (doubles growth).
-WEALTH_LITERACY_SCALE = 5.0
+# Kapital per capita at which the kapital bonus is 100% (doubles growth).
+KAPITAL_LITERACY_SCALE = 5.0
 
-# Maximum wealth bonus to literacy growth (additive fraction, e.g. 0.5 = +50%).
-WEALTH_LITERACY_CAP = 0.5
+# Maximum kapital bonus to literacy growth (additive fraction, e.g. 0.5 = +50%).
+KAPITAL_LITERACY_CAP = 0.5
 
 # ---------------------------------------------------------------------------
 # Population growth dilution

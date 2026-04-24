@@ -49,6 +49,11 @@ class Order(models.Model):
         DESIGNATE_CAPITAL = "designate_capital"
         ALLOCATE_DP = "allocate_dp"
         TRANSFER_DP = "transfer_dp"
+        SET_TAX_RATE = "set_tax_rate"
+        SET_SUBSIDY = "set_subsidy"
+        GOV_PURCHASE = "gov_purchase"
+        GOV_SELL = "gov_sell"
+        GIFT_RESOURCES = "gift_resources"
 
     class Status(models.TextChoices):
         DRAFT = "draft"

@@ -3,7 +3,7 @@ from rest_framework import serializers
 from .models import NationGoodStock, NationResourcePool, ResourceLedger, ProvinceLedger
 
 
-VALID_RESOURCE_KEYS = {"food", "materials", "energy", "wealth", "manpower", "research"}
+VALID_RESOURCE_KEYS = {"food", "materials", "energy", "kapital", "manpower", "research"}
 
 
 class ConstructionBuildingSerializer(serializers.Serializer):

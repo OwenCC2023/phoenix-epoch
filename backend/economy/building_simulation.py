@@ -29,7 +29,7 @@ get_level_data(building_type, level) from provinces.building_constants.
 """
 
 # Basic resource keys stored in NationResourcePool
-_POOL_RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
+_POOL_RESOURCE_KEYS = ["food", "materials", "energy", "kapital", "manpower", "research"]
 
 from provinces.constants import DESIGNATION_BUILDING_MODIFIER
 from .happiness import get_happiness_worker_productivity

@@ -83,7 +83,7 @@ class CapitalRelocation(models.Model):
     )
     started_turn = models.PositiveIntegerField()
     completes_turn = models.PositiveIntegerField()
-    # JSON snapshot of resources spent: {"wealth": 500, "materials": 200}
+    # JSON snapshot of resources spent: {"kapital": 500, "materials": 200}
     cost_paid = models.JSONField(default=dict)
 
     def __str__(self):

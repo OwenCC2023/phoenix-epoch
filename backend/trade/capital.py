@@ -14,10 +14,10 @@ Provides:
 """
 
 from .constants import (
-    CAPITAL_MOVE_COST_WEALTH_PEACE,
+    CAPITAL_MOVE_COST_KAPITAL_PEACE,
     CAPITAL_MOVE_COST_MATERIALS_PEACE,
     CAPITAL_MOVE_DELAY_TURNS,
-    CAPITAL_MOVE_COST_WEALTH_WAR,
+    CAPITAL_MOVE_COST_KAPITAL_WAR,
     CAPITAL_MOVE_COST_MATERIALS_WAR,
     CAPITAL_MOVE_DELAY_TURNS_WAR,
 )
@@ -36,11 +36,11 @@ def get_relocation_cost(wartime: bool) -> dict:
     """Return the resource cost dict for a capital relocation."""
     if wartime:
         return {
-            "wealth": CAPITAL_MOVE_COST_WEALTH_WAR,
+            "kapital": CAPITAL_MOVE_COST_KAPITAL_WAR,
             "materials": CAPITAL_MOVE_COST_MATERIALS_WAR,
         }
     return {
-        "wealth": CAPITAL_MOVE_COST_WEALTH_PEACE,
+        "kapital": CAPITAL_MOVE_COST_KAPITAL_PEACE,
         "materials": CAPITAL_MOVE_COST_MATERIALS_PEACE,
     }
 
@@ -80,9 +80,9 @@ def validate_capital_relocation(nation, target_province, pool) -> list[str]:
     wartime = is_wartime_capital_loss(nation)
     cost = get_relocation_cost(wartime)
 
-    if getattr(pool, "wealth", 0) < cost["wealth"]:
+    if getattr(pool, "kapital", 0) < cost["kapital"]:
         errors.append(
-            f"Insufficient wealth: need {cost['wealth']}, have {getattr(pool, 'wealth', 0):.0f}."
+            f"Insufficient kapital: need {cost['kapital']}, have {getattr(pool, 'kapital', 0):.0f}."
         )
     if getattr(pool, "materials", 0) < cost["materials"]:
         errors.append(
@@ -102,9 +102,9 @@ def initiate_capital_relocation(nation, target_province, pool, current_turn: int
     delay = get_relocation_delay(wartime)
 
     # Deduct resources
-    pool.wealth -= cost["wealth"]
+    pool.kapital -= cost["kapital"]
     pool.materials -= cost["materials"]
-    pool.save(update_fields=["wealth", "materials"])
+    pool.save(update_fields=["kapital", "materials"])
 
     relocation = CapitalRelocation.objects.create(
         nation=nation,

@@ -23,7 +23,7 @@ CONTROL_DEFAULT = 100.0
 #
 # Formula: production_bonus = PRODUCTION_BONUS_MAX * (1 - control/100)
 # At 100% control: +0% bonus. At 1% control: ~+24.75% bonus.
-# Applies to materials, energy, and wealth only (not food or manpower).
+# Applies to materials, energy, and kapital only (not food or manpower).
 PRODUCTION_BONUS_MAX = 0.25
 
 # ---------------------------------------------------------------------------

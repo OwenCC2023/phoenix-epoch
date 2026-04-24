@@ -71,11 +71,11 @@ DOMAIN_CAPACITY_EFFECT_KEY = {
 # ---------------------------------------------------------------------------
 # Capital relocation
 # ---------------------------------------------------------------------------
-CAPITAL_MOVE_COST_WEALTH_PEACE = 500
+CAPITAL_MOVE_COST_KAPITAL_PEACE = 500
 CAPITAL_MOVE_COST_MATERIALS_PEACE = 200
 CAPITAL_MOVE_DELAY_TURNS = 12
 
 # Wartime (original capital held by enemy): half cost, instant
-CAPITAL_MOVE_COST_WEALTH_WAR = CAPITAL_MOVE_COST_WEALTH_PEACE // 2
+CAPITAL_MOVE_COST_KAPITAL_WAR = CAPITAL_MOVE_COST_KAPITAL_PEACE // 2
 CAPITAL_MOVE_COST_MATERIALS_WAR = CAPITAL_MOVE_COST_MATERIALS_PEACE // 2
 CAPITAL_MOVE_DELAY_TURNS_WAR = 0

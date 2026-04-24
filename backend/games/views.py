@@ -263,7 +263,7 @@ class GameAdminOverviewView(APIView):
                     "food": pool.food if pool else 0,
                     "materials": pool.materials if pool else 0,
                     "energy": pool.energy if pool else 0,
-                    "wealth": pool.wealth if pool else 0,
+                    "kapital": pool.kapital if pool else 0,
                     "manpower": pool.manpower if pool else 0,
                     "research": pool.research if pool else 0,
                     "stability": pool.stability if pool else 50,

@@ -54,7 +54,7 @@ from .control import (
 )
 
 
-RESOURCE_KEYS = ["food", "materials", "energy", "wealth", "manpower", "research"]
+RESOURCE_KEYS = ["food", "materials", "energy", "kapital", "manpower", "research"]
 
 
 def empty_resources():
@@ -128,7 +128,7 @@ def simulate_nation_economy(nation, turn_number):
         calculate_province_designation,
         terrain_primary_resource,
         terrain_best_multiplier,
-        SUBSISTENCE_RATE,
+        subsistence_rate_for,
         MANPOWER_PER_POP,
     )
     from provinces.constants import DESIGNATION_SUBSISTENCE_MODIFIERS
@@ -139,6 +139,19 @@ def simulate_nation_economy(nation, turn_number):
 
     # Pre-compute total population (needed for food stability supplement below)
     total_pop = sum(p.population for p in provinces)
+
+    # Wealth & Taxation System (Phase 2): compute this turn's prices from the
+    # previous turn's market snapshot and reset the demand/supply accumulator.
+    # Downstream tax hooks read prices via nation._prices_this_turn.
+    from .pricing import compute_turn_start_prices, reset_accumulator
+    reset_accumulator(nation)
+    _ws_prices = compute_turn_start_prices(nation)
+    nation._prices_this_turn = _ws_prices["prices"]
+    nation._shortage_factors_this_turn = _ws_prices["shortage_factors"]
+
+    # Phase 6: per-turn subsidy execution — inject demand before building
+    # production so shortage_factor picks it up next turn.
+    _execute_subsidies(nation, nation._prices_this_turn)
 
     # Gather national modifiers
     national_modifiers = _gather_national_modifiers(nation, turn_number)
@@ -220,11 +233,11 @@ def simulate_nation_economy(nation, turn_number):
         trait_effects.get("manpower_bonus", 0.0)
         + policy_effects.get("manpower_bonus", 0.0)
     )
-    wealth_mod_from_traits = (
-        trait_effects.get("wealth_production_bonus", 0.0)
-        + trait_effects.get("production_wealth_pct", 0.0)
-        + policy_effects.get("wealth_production_bonus", 0.0)
-        + policy_effects.get("production_wealth_pct", 0.0)
+    kapital_mod_from_traits = (
+        trait_effects.get("kapital_production_bonus", 0.0)
+        + trait_effects.get("production_kapital_pct", 0.0)
+        + policy_effects.get("kapital_production_bonus", 0.0)
+        + policy_effects.get("production_kapital_pct", 0.0)
     )
     food_mod_from_traits = (
         trait_effects.get("food_production_bonus", 0.0)
@@ -321,7 +334,7 @@ def simulate_nation_economy(nation, turn_number):
 
         raw_production = empty_resources()
         base_primary = round(
-            job_status["subsistence_workers"] * SUBSISTENCE_RATE * best_mult
+            job_status["subsistence_workers"] * subsistence_rate_for(primary) * best_mult
             * desg_mods.get(primary, 1.0),
             2,
         )
@@ -364,10 +377,10 @@ def simulate_nation_economy(nation, turn_number):
             # Rebels have seized the province — no production reaches the nation.
             raw_production = empty_resources()
         else:
-            # Control production bonus applies to materials, energy, wealth only.
+            # Control production bonus applies to materials, energy, kapital only.
             prod_bonus = compute_production_bonus(province_control)
             if prod_bonus > 0:
-                for key in ("materials", "energy", "wealth"):
+                for key in ("materials", "energy", "kapital"):
                     raw_production[key] = round(raw_production[key] * (1.0 + prod_bonus), 2)
 
         # ----------------------------------------------------------------
@@ -425,15 +438,15 @@ def simulate_nation_economy(nation, turn_number):
         security_stability_mult = get_security_stability_multiplier(province.local_security)
 
         # Step 6a-bis: Literacy growth
-        # Uses security (just computed), wealth output, and policy state.
+        # Uses security (just computed), kapital output, and policy state.
         # Pop growth rate from previous turn is passed as 0.0 if unavailable
         # (first turn or not yet computed); dilution is a secondary effect.
-        wealth_per_cap = raw_production.get("wealth", 0.0) / max(province.population, 1)
+        kapital_per_cap = raw_production.get("kapital", 0.0) / max(province.population, 1)
         province.literacy = compute_literacy_growth(
             province=province,
             bldg_effects=bldg_effects,
             security=province.local_security,
-            wealth_per_cap=wealth_per_cap,
+            kapital_per_cap=kapital_per_cap,
             pop_growth_rate=0.0,  # previous turn's rate — computed at Step 13
             active_policies=active_policies,
             trait_effects=trait_effects,
@@ -530,8 +543,8 @@ def simulate_nation_economy(nation, turn_number):
     national_modifier_effects = empty_resources()
     production_modifiers = dict(national_modifiers.get("production", {}))
     # Merge trait production bonuses into production modifiers
-    if wealth_mod_from_traits:
-        production_modifiers["wealth"] = production_modifiers.get("wealth", 0) + wealth_mod_from_traits
+    if kapital_mod_from_traits:
+        production_modifiers["kapital"] = production_modifiers.get("kapital", 0) + kapital_mod_from_traits
     modified_pool = {}
     for key in RESOURCE_KEYS:
         mod = production_modifiers.get(key, 0)
@@ -561,10 +574,10 @@ def simulate_nation_economy(nation, turn_number):
     # upkeep_reduction from buildings (e.g. banks, fuel depots) and traits reduces total upkeep.
     consumption_modifier = national_modifiers.get("consumption", 0)
     gov_upkeep = empty_resources()
-    base_upkeep_wealth = total_pop * 0.01
+    base_upkeep_kapital = total_pop * 0.01
     total_upkeep_reduction = min(0.75, upkeep_reduction + upkeep_reduction_from_traits)
     upkeep_scale = (1 + consumption_modifier) * (1.0 - total_upkeep_reduction)
-    gov_upkeep["wealth"] = round(base_upkeep_wealth * upkeep_scale, 2)
+    gov_upkeep["kapital"] = round(base_upkeep_kapital * upkeep_scale, 2)
     gov_upkeep["energy"] = round(total_pop * 0.005 * upkeep_scale, 2)
 
     # Step 10: Final pool calculation
@@ -743,6 +756,156 @@ def simulate_nation_economy(nation, turn_number):
     # Step 19: Annual DP grant (System 17)
     _grant_annual_dp(nation, turn_number)
 
+    # Step 19.5: Wealth & Taxation — income + land tax collection, debt interest.
+    _collect_wealth_taxation(
+        nation=nation,
+        turn_number=turn_number,
+        provinces=provinces,
+        province_job_status=province_job_status,
+        prices=nation._prices_this_turn,
+    )
+
+    # Step 20: Wealth & Taxation market snapshot (System 18).
+    # Persist this turn's prices, min subsistence productivities, and
+    # aggregated demand/supply so next turn can price resources dynamically.
+    _flush_wealth_taxation_snapshot(
+        nation=nation,
+        turn_number=turn_number,
+        provinces=provinces,
+        province_job_status=province_job_status,
+        total_pop=total_pop,
+        prices_this_turn=nation._prices_this_turn,
+    )
+
+
+def _execute_subsidies(nation, prices: dict) -> None:
+    """Spend rate × treasury across configured sector goods each turn.
+
+    Debits treasury and credits stockpile.  Demand is recorded so
+    shortage_factor sees the extra pull next turn.
+    """
+    from decimal import Decimal
+    from .models import NationGoodStock, NationResourcePool
+    from .pricing import record_demand
+    from .pricing_constants import BASIC_RESOURCES_SET, SUBSIDY_SECTOR_MAP
+
+    subsidies = nation.subsidies or {}
+    if not subsidies:
+        return
+    pool, _ = NationResourcePool.objects.get_or_create(nation=nation)
+    treasury = Decimal(pool.treasury or 0)
+    if treasury <= 0:
+        return
+    stock, _ = NationGoodStock.objects.get_or_create(nation=nation)
+
+    total_spend = Decimal("0.00")
+    pool_dirty = False
+    stock_dirty = False
+
+    for sector, rate in subsidies.items():
+        try:
+            rate_f = float(rate)
+        except Exception:
+            continue
+        if rate_f <= 0:
+            continue
+        goods = SUBSIDY_SECTOR_MAP.get(sector) or []
+        if not goods:
+            continue
+        total_sector_spend = float(treasury) * rate_f
+        per_good_spend = total_sector_spend / len(goods)
+        for good in goods:
+            price = float(prices.get(good, 1.0))
+            if price <= 0:
+                continue
+            qty = per_good_spend / price
+            if qty <= 0:
+                continue
+            # Credit stockpile (base resource → pool, manufactured → good stock).
+            if good in BASIC_RESOURCES_SET:
+                setattr(pool, good, float(getattr(pool, good, 0) or 0) + qty)
+                pool_dirty = True
+            else:
+                if hasattr(stock, good):
+                    setattr(stock, good, float(getattr(stock, good, 0) or 0) + qty)
+                    stock_dirty = True
+            total_spend += Decimal(f"{per_good_spend:.2f}")
+            record_demand(nation, good, qty)
+
+    pool.treasury = treasury - total_spend
+    fields = ["treasury"]
+    if pool_dirty:
+        fields.extend(list(BASIC_RESOURCES_SET))
+    pool.save(update_fields=fields)
+    if stock_dirty:
+        stock.save()
+
+
+def _collect_wealth_taxation(
+    nation, turn_number, provinces, province_job_status, prices
+) -> None:
+    """Income + land tax collection across provinces; debt interest compounding."""
+    from .models import ProvinceLedger
+    from .taxation import collect_nation_turn_taxes, compound_debt_interest
+
+    raw_productions: dict = {}
+    for pl in ProvinceLedger.objects.filter(province__in=provinces, turn_number=turn_number):
+        raw_productions[pl.province_id] = pl.raw_production or {}
+
+    collect_nation_turn_taxes(
+        nation=nation,
+        provinces=provinces,
+        prices=prices,
+        raw_productions=raw_productions,
+        job_statuses=province_job_status,
+    )
+    compound_debt_interest(nation)
+
+
+def _flush_wealth_taxation_snapshot(
+    nation, turn_number, provinces, province_job_status, total_pop, prices_this_turn
+) -> None:
+    """Aggregate this turn's market data and persist a NationMarketSnapshot row."""
+    from .constants import FOOD_CONSUMPTION_PER_POP
+    from .models import ProvinceLedger
+    from .pricing import (
+        compute_min_productivities_from_data,
+        compute_shortage_factors,
+        flush_market_snapshot,
+        get_accumulated,
+    )
+
+    raw_productions: dict = {}
+    for pl in ProvinceLedger.objects.filter(province__in=provinces, turn_number=turn_number):
+        raw_productions[pl.province_id] = pl.raw_production or {}
+
+    min_prod = compute_min_productivities_from_data(
+        provinces, province_job_status, raw_productions
+    )
+
+    monthly_demand, monthly_supply = get_accumulated(nation)
+    # Always-on supply: subsistence output of basic resources.
+    for pid, rp in raw_productions.items():
+        for res, qty in (rp or {}).items():
+            if res in ("food", "materials", "energy", "kapital"):
+                monthly_supply[res] = monthly_supply.get(res, 0.0) + float(qty)
+    # Always-on demand: population food consumption.
+    monthly_demand["food"] = (
+        monthly_demand.get("food", 0.0) + total_pop * FOOD_CONSUMPTION_PER_POP
+    )
+
+    shortage = compute_shortage_factors({}, monthly_demand, monthly_supply)
+
+    flush_market_snapshot(
+        nation=nation,
+        turn_number=turn_number,
+        prices=prices_this_turn,
+        monthly_demand=monthly_demand,
+        monthly_supply=monthly_supply,
+        prev_subsistence_productivity=min_prod,
+        shortage_factors=shortage,
+    )
+
 
 def _persist_control_pool_snapshots(provinces, nation, turn_number: int, integration_modifier: float) -> None:
     """Persist per-turn ControlPoolSnapshot rows for provinces and regions.
@@ -770,7 +933,7 @@ def _persist_control_pool_snapshots(provinces, nation, turn_number: int, integra
             prov_integration = min(1.0, integration_modifier)
             # Total = surplus that would flow under full integration + control.
             # Approximate using manpower as 0 (not a "taxable" resource).
-            tax_total = round((res.wealth or 0.0) * prov_integration, 2)
+            tax_total = round((res.kapital or 0.0) * prov_integration, 2)
             trade_total = round(((res.materials or 0.0) + (res.energy or 0.0)) * prov_integration, 2)
             bc_total = round((res.research or 0.0) * prov_integration, 2)
             research_total = bc_total
@@ -845,7 +1008,7 @@ def _apply_military_upkeep(nation, provinces, trait_effects):
     """
     Deduct per-unit-per-turn upkeep costs from the nation's resource pools.
 
-    Basic resources (food, manpower, wealth, energy) are deducted from
+    Basic resources (food, manpower, kapital, energy) are deducted from
     NationResourcePool; manufactured goods (military_goods, fuel) are deducted
     from NationGoodStock.  Units whose manufactured-goods or fuel upkeep cannot
     be met are set to is_active=False (they are NOT destroyed).

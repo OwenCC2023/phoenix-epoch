@@ -27,6 +27,11 @@ Summary of what needs to be built:
 - **International Migration** — `WHITESPACE_MIGRATION_ENABLED = False` in `economy/whitespace_constants.py`. When built, whitespace populations will participate in cross-border migration flows. Wire into `_simulate_whitespace_province()` in `economy/whitespace.py`.
 - **Rebel spawning** — **now wired** (System 16). `REBEL_SPAWNING_ENABLED = True`; provinces with `militarist` or `nationalist` traits spawn ownerless rebel bands at 2% per turn.
 
+## Wealth & Taxation stubs (System 18)
+- **`control_tax_multiplier(control)`** in `economy/control.py` currently returns `1.0` for all control levels. Tune the curve (low control → reduced TE) when the Control System is extended.
+- **Class System income-tax ranks** — Progressive, Regressive, and Wealth-Redistribution ranks fall back to flat × 1.0 via the `_INCOME_STRUCTURE_MULT` table in `economy/taxation.py`. Activate when the Class System is built.
+- **Communal Duties gift rank** — returns 0 (redistribution not implemented); gifts go directly to recipient stockpile without tax.
+
 ## Control & Rebellion stubs (System 16)
 - **Partisan rebels** — `spawn_partisan_rebels()` in `economy/rebellion.py` is a no-op. Requires the Occupation System to track enemy-occupied provinces. Set `PARTISAN_SPAWN_ENABLED = True` in `economy/control_constants.py` when ready.
 - **Combat-based rebel suppression** — `check_rebel_suppression()` is a stub: returns True if any non-rebel formation in the province outstrengths rebels by effective_strength. Replace with actual combat resolution when the Combat System is built.

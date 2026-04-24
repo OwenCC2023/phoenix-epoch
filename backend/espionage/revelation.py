@@ -36,9 +36,9 @@ def _count_category_items(target_nation, game, category, provinces, buildings_by
                     {"province_id": prov.id, "field": field, "value": getattr(prov, field)},
                     prov.population,
                 ))
-            # Wealth comes from the resource pool, use population as proxy
+            # Kapital comes from the resource pool, use population as proxy
             items.append((
-                {"province_id": prov.id, "field": "wealth", "value": None},
+                {"province_id": prov.id, "field": "kapital", "value": None},
                 prov.population,
             ))
         return items

@@ -31,6 +31,7 @@ GOV_DIRECTION = {
     "top_down": {
         "stability": -1,
         "integration": 0.08,
+        "tax_efficiency": -0.06,
         "building_efficiency": {
             "heavy_manufacturing": 0.06,
             "extraction": 0.05,
@@ -40,6 +41,7 @@ GOV_DIRECTION = {
     "bottom_up": {
         "stability": 1,
         "growth": 0.002,
+        "tax_efficiency": 0.06,
         "building_efficiency": {
             "light_manufacturing": 0.05,
             "farming": 0.06,
@@ -58,7 +60,7 @@ GOV_DIRECTION = {
 GOV_ECONOMIC_CATEGORY = {
     "liberal": {
         "trade": 0.10,
-        "production": {"wealth": 0.08},
+        "production": {"kapital": 0.08},
         "building_efficiency": {
             "financial": 0.08,
             "transport": 0.06,
@@ -68,6 +70,7 @@ GOV_ECONOMIC_CATEGORY = {
         "stability": 2,
         "growth": 0.001,
         "consumption": -0.05,
+        "tax_efficiency": 0.06,
         "production": {"food": 0.04, "materials": 0.04},
         "building_efficiency": {
             "light_manufacturing": 0.06,
@@ -83,6 +86,7 @@ GOV_ECONOMIC_CATEGORY = {
         },
     },
     "resource": {
+        "tax_efficiency": -0.06,
         "production": {"materials": 0.05, "energy": 0.05},
         "building_efficiency": {
             "extraction": 0.10,
@@ -101,6 +105,7 @@ GOV_ECONOMIC_CATEGORY = {
     "subsistence": {
         "stability": 1,
         "growth": 0.002,
+        "tax_efficiency": -0.06,
         "production": {"food": 0.08},
         "building_efficiency": {
             "farming": 0.10,
@@ -117,6 +122,7 @@ GOV_STRUCTURE = {
     "hereditary": {
         "stability": 3,
         "growth": 0.001,
+        "tax_efficiency": 0.05,
         "building_efficiency": {
             "financial": 0.05,
             "religious": 0.06,
@@ -125,6 +131,7 @@ GOV_STRUCTURE = {
     "power_consensus": {
         "integration": 0.05,
         "stability": 1,
+        "tax_efficiency": -0.05,
         "building_efficiency": {
             "financial": 0.05,
             "government_management": 0.05,
@@ -140,7 +147,8 @@ GOV_STRUCTURE = {
     },
     "representative": {
         "stability": 1,
-        "production": {"wealth": 0.04},
+        "tax_efficiency": 0.05,
+        "production": {"kapital": 0.04},
         "building_efficiency": {
             "financial": 0.06,
             "communications": 0.05,
@@ -163,6 +171,7 @@ GOV_STRUCTURE = {
 GOV_POWER_ORIGIN = {
     "elections": {
         "stability": 2,
+        "tax_efficiency": 0.05,
         "building_efficiency": {
             "financial": 0.05,
             "communications": 0.07,
@@ -170,7 +179,7 @@ GOV_POWER_ORIGIN = {
     },
     "economic_success": {
         "research": 0.08,
-        "production": {"wealth": 0.06},
+        "production": {"kapital": 0.06},
         "building_efficiency": {
             "financial": 0.08,
             "government_management": 0.05,
@@ -186,6 +195,7 @@ GOV_POWER_ORIGIN = {
     "military_power": {
         "stability": -3,
         "military": 0.10,
+        "tax_efficiency": -0.06,
         "production": {"manpower": 0.10},
         "building_efficiency": {
             "heavy_manufacturing": 0.07,
@@ -219,6 +229,7 @@ GOV_POWER_TYPE = {
         "integration": 0.08,
         "stability": -2,
         "military": 0.05,
+        "tax_efficiency": 0.05,
         "building_efficiency": {
             "heavy_manufacturing": 0.06,
             "construction": 0.06,
@@ -227,6 +238,7 @@ GOV_POWER_TYPE = {
     "council": {
         "integration": 0.03,
         "stability": 1,
+        "tax_efficiency": 0.05,
         "building_efficiency": {
             "financial": 0.05,
             "government_management": 0.06,
@@ -234,7 +246,7 @@ GOV_POWER_TYPE = {
     },
     "large_body": {
         "stability": 2,
-        "production": {"wealth": 0.04},
+        "production": {"kapital": 0.04},
         "building_efficiency": {
             "communications": 0.06,
             "government_organization": 0.05,
@@ -243,6 +255,7 @@ GOV_POWER_TYPE = {
     "multi_body": {
         "trade": 0.05,
         "stability": -1,
+        "tax_efficiency": -0.05,
         "building_efficiency": {
             "financial": 0.04,
             "transport": 0.05,
@@ -251,6 +264,7 @@ GOV_POWER_TYPE = {
     "staggered_groups": {
         "stability": 2,
         "integration": 0.02,
+        "tax_efficiency": -0.05,
         "building_efficiency": {
             "government_management": 0.06,
             "government_oversight": 0.04,
@@ -305,7 +319,7 @@ def get_combined_government_effects(gov_direction, gov_economic_category,
     percentage keys hold net bonus fractions (combined multiplier - 1).
     Downstream code adds 1.0 before applying (unchanged interface).
     """
-    _ADDITIVE_KEYS = {"stability", "growth"}
+    _ADDITIVE_KEYS = {"stability", "growth", "tax_efficiency"}
     _SCALAR_PCT_KEYS = {"integration", "trade", "research", "military", "consumption"}
     _NESTED_PCT_KEYS = {"production", "building_efficiency"}
 

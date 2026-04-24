@@ -56,7 +56,7 @@ MISMATCH_WEAK_WEIGHT   = 1.0 / 6.0  # each weak slot is half a strong slot
 # Resource cost to economically acquire an unclaimed province.
 # Paid immediately from NationResourcePool.
 ECONOMIC_ACQUISITION_COSTS = {
-    "wealth":    2000,
+    "kapital":    2000,
     "materials": 1000,
 }
 

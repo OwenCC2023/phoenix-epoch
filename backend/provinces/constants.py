@@ -84,10 +84,10 @@ TERRAIN_TYPES = {
         "label": "Coast",
         "description": "Coastal region with access to sea trade routes.",
         "multipliers": {
-            "agriculture": 1.0,
+            "agriculture": 1.5,
             "industry": 0.9,
             "energy": 1.0,
-            "commerce": 1.5,
+            "commerce": 1.3,
             "military": 1.0,
             "research": 1.0,
         },
@@ -148,7 +148,7 @@ SECTOR_RESOURCE_MAP = {
     "extraction": "materials",
     "industry": "materials",
     "energy": "energy",
-    "commerce": "wealth",
+    "commerce": "kapital",
     "military": "manpower",
     "research": "research",
 }
@@ -248,22 +248,22 @@ URBAN_RUINS_URBAN_THRESHOLD = 40000  # lower bar for urban_ruins (former city in
 DESIGNATION_SUBSISTENCE_MODIFIERS = {
     "rural": {
         "food": 1.20, "materials": 1.20, "energy": 1.20,
-        "manpower": 1.10, "wealth": 0.90, "research": 0.90,
+        "manpower": 1.10, "kapital": 0.90, "research": 0.90,
     },
     "urban": {
         "food": 0.85, "materials": 0.90, "energy": 0.90,
-        "manpower": 0.90, "wealth": 1.20, "research": 1.20,
+        "manpower": 0.90, "kapital": 1.20, "research": 1.20,
     },
     "post_urban": {
         "food": 0.95, "materials": 1.00, "energy": 1.00,
-        "manpower": 1.00, "wealth": 1.10, "research": 1.15,
+        "manpower": 1.00, "kapital": 1.10, "research": 1.15,
     },
     # Capital behaves like a moderate urban centre.
     # Government-building bonuses and bureaucratic capacity are not yet
     # implemented; the designation is a placeholder for that future system.
     "capital": {
         "food": 0.90, "materials": 0.90, "energy": 0.90,
-        "manpower": 0.90, "wealth": 1.15, "research": 1.15,
+        "manpower": 0.90, "kapital": 1.15, "research": 1.15,
     },
 }
 

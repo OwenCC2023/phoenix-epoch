@@ -44,6 +44,16 @@ def get_province_control(province) -> float:
 # Core economic formulas
 # ---------------------------------------------------------------------------
 
+def control_tax_multiplier(control: float) -> float:
+    """Per-province tax efficiency multiplier based on control (STUB).
+
+    Wealth & Taxation System hook — low-control provinces collect less tax.
+    Currently returns 1.0 unconditionally; tune curve when the Control System
+    is extended.  See docs/future_systems.md.
+    """
+    return 1.0
+
+
 def compute_national_flow_fraction(control: float) -> float:
     """Fraction of province surplus that reaches the national government.
 
@@ -58,7 +68,7 @@ def compute_production_bonus(control: float) -> float:
     """Production multiplier bonus from loosened control.
 
     Lower control lets local producers operate with less interference.
-    Applies to materials, energy, and wealth only (not food or manpower).
+    Applies to materials, energy, and kapital only (not food or manpower).
 
     Formula: PRODUCTION_BONUS_MAX * (1 - control/100)
     At 100% control → 0.0  (no bonus)

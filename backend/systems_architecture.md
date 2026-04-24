@@ -49,7 +49,7 @@ All four systems write into the same set of effect columns. There are 162 column
 | 21-29 | Military (stubs) | Army/Navy/Air training, combat, upkeep | Buildings (military), Policies, Traits |
 | 28-39 | Gov & Trait Modifiers | Flat and percentage national modifiers (stability, growth, integration, trade, research, military, consumption, production by type) | Policies (primary), Traits, Gov Options |
 | 40-62 | Building Efficiency | BE bonuses per building category | Gov Options, Traits (NOT policies or buildings) |
-| 63-72 | Trait Effects | Manpower, wealth/food production, rural/urban modifiers | Traits (primary), Policies |
+| 63-72 | Trait Effects | Manpower, kapital/food production, rural/urban modifiers | Traits (primary), Policies |
 | 73-79 | Stubs | Training speed, mil upkeep, building restrictions, trade cap, espionage, diplomacy, arms production | Traits (primary), Policies |
 | 80-158 | Building Forbidden | Binary: which buildings a policy forbids | Policies only |
 | 159-161 | New Effects | Corruption Resistance, Environmental Health, Worker Productivity | Policies (primary), Traits |
@@ -181,7 +181,7 @@ When evaluating which options are available:
 ### Adding a new Building
 
 1. Pick a category from the existing list (financial, light_manufacturing, etc.) or define a new one.
-2. Assign 2-4 effects using Provincial (cols 2-14) and National Capacity (cols 15-20) columns primarily. Military buildings can use Military stubs (cols 21-29). Financial buildings can use Wealth Prod (col 66). Arms-related buildings can use Arms Prod Bonus (col 82).
+2. Assign 2-4 effects using Provincial (cols 2-14) and National Capacity (cols 15-20) columns primarily. Military buildings can use Military stubs (cols 21-29). Financial buildings can use Kapital Prod (col 66). Arms-related buildings can use Arms Prod Bonus (col 82).
 3. Do NOT assign effects in Gov & Trait Modifiers (28-39) or Building Efficiency (40-62). Those are for Policies, Gov Options, and Traits only.
 4. Scale values to match existing buildings in the same category.
 5. Check whether any existing Policy or Trait should forbid this building. Add disabling rules as needed.
@@ -280,7 +280,7 @@ All numeric values across all systems should be internally consistent. These ran
 | Research (%) | -0.04 to +0.05 | -0.10 to +0.15 (as bonus) |
 | Military (%) | -0.06 to +0.06 | 0 to +0.10 |
 | Consumption (%) | -0.05 to +0.04 | n/a |
-| Production (food/materials/wealth/energy/manpower) | -0.06 to +0.06 | -0.05 to +0.15 |
+| Production (food/materials/kapital/energy/manpower) | -0.06 to +0.06 | -0.05 to +0.15 |
 
 ### Building Efficiency (gov options, traits only)
 | Range | Notes |

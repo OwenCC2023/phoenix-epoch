@@ -8,7 +8,7 @@ class NationResourcePool(models.Model):
     food = models.FloatField(default=0)
     materials = models.FloatField(default=0)
     energy = models.FloatField(default=0)
-    wealth = models.FloatField(default=0)
+    kapital = models.FloatField(default=0)
     manpower = models.FloatField(default=0)
     research = models.FloatField(default=0)
     stability = models.FloatField(default=50.0)
@@ -16,6 +16,10 @@ class NationResourcePool(models.Model):
     literacy = models.FloatField(default=0.20)  # national average literacy (0.0-1.0)
     total_population = models.PositiveIntegerField(default=0)
     consecutive_food_deficit_turns = models.PositiveIntegerField(default=0)
+
+    # Wealth & Taxation System — government balance of food-equivalent tokens.
+    # May go negative (debt); interest compounds when negative (see taxation.py).
+    treasury = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     def __str__(self):
         return f"Resources for {self.nation}"
@@ -123,6 +127,40 @@ class NationGoodStock(models.Model):
 
     def __str__(self):
         return f"Good stocks for {self.nation}"
+
+
+class NationMarketSnapshot(models.Model):
+    """Immutable per-turn snapshot of a nation's market state.
+
+    Used by the pricing module to compute next turn's base resource prices from
+    the marginal-producer productivity of the previous turn, and by analytics
+    to reconstruct the shortage_factor history.
+    """
+
+    nation = models.ForeignKey(
+        "nations.Nation", on_delete=models.CASCADE, related_name="market_snapshots"
+    )
+    turn_number = models.PositiveIntegerField()
+
+    # {good_key: food_equiv_price}
+    prices = models.JSONField(default=dict)
+    # {good_key: qty consumed/produced this turn}
+    monthly_demand = models.JSONField(default=dict)
+    monthly_supply = models.JSONField(default=dict)
+    # {resource_key: min per-worker subsistence productivity across marginal provinces}
+    prev_subsistence_productivity = models.JSONField(default=dict)
+    # {good_key: shortage_factor [0.5, 3.0]}
+    shortage_factors = models.JSONField(default=dict)
+
+    class Meta:
+        unique_together = ("nation", "turn_number")
+        ordering = ["-turn_number"]
+        indexes = [
+            models.Index(fields=["nation", "-turn_number"]),
+        ]
+
+    def __str__(self):
+        return f"Market snapshot: {self.nation} turn {self.turn_number}"
 
 
 class ResearchUnlock(models.Model):

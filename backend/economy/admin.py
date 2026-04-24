@@ -11,7 +11,7 @@ class NationGoodStockAdmin(admin.ModelAdmin):
 
 @admin.register(NationResourcePool)
 class NationResourcePoolAdmin(admin.ModelAdmin):
-    list_display = ("nation", "food", "materials", "energy", "wealth", "manpower", "research", "stability", "total_population")
+    list_display = ("nation", "food", "materials", "energy", "kapital", "manpower", "research", "stability", "total_population")
     search_fields = ("nation__name",)
 
 

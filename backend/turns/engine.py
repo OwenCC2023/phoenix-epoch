@@ -54,6 +54,7 @@ class TurnResolutionEngine:
             self._execute_espionage_orders(turn)
             self._execute_acquisition_orders(turn)
             self._execute_trade_orders(turn)
+            self._execute_tax_and_spending_orders(turn)
 
             # Step 4: Run economy simulation
             self._run_economy_simulation(turn)
@@ -333,8 +334,20 @@ class TurnResolutionEngine:
         good_stock = NationGoodStock.objects.get(nation=order.nation)
         good_stock.military_goods -= unit_def["military_goods_cost"] * quantity
         pool.manpower -= unit_def["manpower_cost"] * quantity
-        good_stock.save(update_fields=["military_goods"])
-        pool.save(update_fields=["manpower"])
+        # Wealth & Taxation: charge treasury for the food-equivalent value of
+        # the goods consumed (manpower is a special good, not priced).
+        try:
+            from decimal import Decimal
+            from economy.pricing import compute_turn_start_prices
+            prices = compute_turn_start_prices(order.nation)["prices"]
+            mg_price = float(prices.get("military_goods", 1.0))
+            food_equiv = unit_def["military_goods_cost"] * quantity * mg_price
+            pool.treasury = Decimal(pool.treasury or 0) - Decimal(f"{food_equiv:.2f}")
+            good_stock.save(update_fields=["military_goods"])
+            pool.save(update_fields=["manpower", "treasury"])
+        except Exception:
+            good_stock.save(update_fields=["military_goods"])
+            pool.save(update_fields=["manpower"])
 
         # Find or create the target formation
         if formation_id:
@@ -939,6 +952,158 @@ class TurnResolutionEngine:
                 f"{order.nation.name}: transferred {amount} DP from '{source_cat}' "
                 f"to '{target_cat}' in province {province_id} (cost {cost})"
             )
+
+    # --- Wealth & Taxation System (System 18) executors -------------------
+
+    def _execute_tax_and_spending_orders(self, turn):
+        """Execute SET_TAX_RATE, SET_SUBSIDY, GOV_PURCHASE, GOV_SELL, GIFT_RESOURCES.
+
+        These mutate Nation.tax_rate, Nation.subsidies, NationResourcePool.treasury,
+        and NationGoodStock / NationResourcePool stockpile balances.
+        Prices for GOV_PURCHASE / GOV_SELL / GIFT come from the nation's most
+        recent NationMarketSnapshot (previous turn's turn-start prices).
+        """
+        from economy.models import NationGoodStock, NationResourcePool
+        from economy.pricing import compute_turn_start_prices
+        from economy.pricing_constants import BASIC_RESOURCES_SET
+        from nations.models import Nation
+
+        order_types = [
+            Order.OrderType.SET_TAX_RATE,
+            Order.OrderType.SET_SUBSIDY,
+            Order.OrderType.GOV_PURCHASE,
+            Order.OrderType.GOV_SELL,
+            Order.OrderType.GIFT_RESOURCES,
+        ]
+        orders = Order.objects.filter(
+            turn=turn, order_type__in=order_types, status=Order.Status.VALIDATED
+        ).select_related("nation")
+
+        for order in orders:
+            nation = order.nation
+            payload = order.payload
+            try:
+                if order.order_type == Order.OrderType.SET_TAX_RATE:
+                    nation.tax_rate = float(payload["new_rate"])
+                    nation.save(update_fields=["tax_rate"])
+                    self._log(f"{nation.name}: tax_rate set to {nation.tax_rate:.2f}")
+
+                elif order.order_type == Order.OrderType.SET_SUBSIDY:
+                    sector = payload["sector"]
+                    rate = float(payload["rate"])
+                    subs = dict(nation.subsidies or {})
+                    if rate <= 0:
+                        subs.pop(sector, None)
+                    else:
+                        subs[sector] = rate
+                    nation.subsidies = subs
+                    nation.save(update_fields=["subsidies"])
+                    self._log(f"{nation.name}: subsidy {sector} = {rate:.2f}")
+
+                elif order.order_type == Order.OrderType.GOV_PURCHASE:
+                    good = payload["good"]
+                    qty = float(payload["qty"])
+                    prices = compute_turn_start_prices(nation)["prices"]
+                    unit_price = float(prices.get(good, 1.0))
+                    cost = qty * unit_price
+                    pool, _ = NationResourcePool.objects.get_or_create(nation=nation)
+                    from decimal import Decimal
+                    pool.treasury = (pool.treasury or Decimal("0")) - Decimal(f"{cost:.2f}")
+                    pool.save(update_fields=["treasury"])
+                    self._credit_good_to_stockpile(nation, good, qty)
+                    self._log(
+                        f"{nation.name}: GOV_PURCHASE {qty:.2f}× {good} "
+                        f"@ {unit_price:.3f} (cost {cost:.2f} treasury)"
+                    )
+
+                elif order.order_type == Order.OrderType.GOV_SELL:
+                    good = payload["good"]
+                    qty = float(payload["qty"])
+                    available = self._stockpile_balance(nation, good)
+                    sell_qty = min(qty, available)
+                    if sell_qty <= 0:
+                        raise ValueError(f"No {good} in stockpile to sell")
+                    prices = compute_turn_start_prices(nation)["prices"]
+                    unit_price = float(prices.get(good, 1.0))
+                    revenue = sell_qty * unit_price
+                    pool, _ = NationResourcePool.objects.get_or_create(nation=nation)
+                    from decimal import Decimal
+                    pool.treasury = (pool.treasury or Decimal("0")) + Decimal(f"{revenue:.2f}")
+                    pool.save(update_fields=["treasury"])
+                    self._debit_good_from_stockpile(nation, good, sell_qty)
+                    self._log(
+                        f"{nation.name}: GOV_SELL {sell_qty:.2f}× {good} "
+                        f"@ {unit_price:.3f} (+{revenue:.2f} treasury)"
+                    )
+
+                elif order.order_type == Order.OrderType.GIFT_RESOURCES:
+                    to_nation = Nation.objects.get(pk=payload["to_nation_id"])
+                    goods = payload["goods"]
+                    from economy.taxation import collect_gift_tax
+                    gift_prices = compute_turn_start_prices(to_nation)["prices"]
+                    for g, q in goods.items():
+                        q = float(q)
+                        avail = self._stockpile_balance(nation, g)
+                        send_qty = min(q, avail)
+                        if send_qty <= 0:
+                            continue
+                        self._debit_good_from_stockpile(nation, g, send_qty)
+                        unit_price = float(gift_prices.get(g, 1.0))
+                        gift_value = send_qty * unit_price
+                        gift_tax = collect_gift_tax(to_nation, g, send_qty, unit_price)
+                        # Receiver keeps what's left after gift tax goes to their treasury.
+                        self._credit_good_to_stockpile(to_nation, g, send_qty)
+                        self._log(
+                            f"{nation.name} gifted {send_qty:.2f}× {g} to "
+                            f"{to_nation.name} (value {gift_value:.2f}, "
+                            f"gift tax +{gift_tax:.2f} to recipient treasury)"
+                        )
+
+                order.status = Order.Status.EXECUTED
+                order.save(update_fields=["status"])
+            except Exception as exc:
+                order.status = Order.Status.FAILED
+                order.validation_errors = [str(exc)]
+                order.save(update_fields=["status", "validation_errors"])
+                self._log(f"{order.order_type} {order.id} failed: {exc}")
+
+    def _stockpile_balance(self, nation, good: str) -> float:
+        """Return how much of `good` is currently in the nation's stockpile."""
+        from economy.models import NationGoodStock, NationResourcePool
+        from economy.pricing_constants import BASIC_RESOURCES_SET
+        if good in BASIC_RESOURCES_SET:
+            pool = NationResourcePool.objects.filter(nation=nation).first()
+            return float(getattr(pool, good, 0) or 0) if pool else 0.0
+        stocks = NationGoodStock.objects.filter(nation=nation).first()
+        return float(getattr(stocks, good, 0) or 0) if stocks else 0.0
+
+    def _credit_good_to_stockpile(self, nation, good: str, qty: float) -> None:
+        from economy.models import NationGoodStock, NationResourcePool
+        from economy.pricing_constants import BASIC_RESOURCES_SET
+        if good in BASIC_RESOURCES_SET:
+            pool, _ = NationResourcePool.objects.get_or_create(nation=nation)
+            setattr(pool, good, float(getattr(pool, good, 0) or 0) + qty)
+            pool.save(update_fields=[good])
+        else:
+            stocks, _ = NationGoodStock.objects.get_or_create(nation=nation)
+            if hasattr(stocks, good):
+                setattr(stocks, good, float(getattr(stocks, good, 0) or 0) + qty)
+                stocks.save(update_fields=[good])
+
+    def _debit_good_from_stockpile(self, nation, good: str, qty: float) -> None:
+        from economy.models import NationGoodStock, NationResourcePool
+        from economy.pricing_constants import BASIC_RESOURCES_SET
+        if good in BASIC_RESOURCES_SET:
+            pool, _ = NationResourcePool.objects.get_or_create(nation=nation)
+            cur = float(getattr(pool, good, 0) or 0)
+            setattr(pool, good, max(0.0, cur - qty))
+            pool.save(update_fields=[good])
+        else:
+            stocks, _ = NationGoodStock.objects.get_or_create(nation=nation)
+            if hasattr(stocks, good):
+                cur = float(getattr(stocks, good, 0) or 0)
+                setattr(stocks, good, max(0.0, cur - qty))
+                stocks.save(update_fields=[good])
 
     def _create_next_turn(self, current_turn):
         """Create the next turn."""

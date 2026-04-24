@@ -44,7 +44,17 @@ from .constants import (
 # rural designation bonus), enough to generate a stockpile surplus that can
 # supplement 1–2 importing provinces.  Deliberately lower than building output
 # to make industrial investment meaningfully rewarding.
-SUBSISTENCE_RATE = 0.05
+# Food kept at 0.05 (numéraire); non-food raised to 0.06 so manufactured-good
+# inputs become cheaper to produce and non-food base prices fall proportionally.
+SUBSISTENCE_RATE_FOOD = 0.05
+SUBSISTENCE_RATE_NONFOOD = 0.06
+# Back-compat alias; new code should use the _FOOD / _NONFOOD constants.
+SUBSISTENCE_RATE = SUBSISTENCE_RATE_FOOD
+
+
+def subsistence_rate_for(resource_key: str) -> float:
+    """Return the per-worker subsistence output rate for the given resource."""
+    return SUBSISTENCE_RATE_FOOD if resource_key == "food" else SUBSISTENCE_RATE_NONFOOD
 
 # Manpower baseline produced per population unit per turn.
 # Represents the latent military potential of a province.

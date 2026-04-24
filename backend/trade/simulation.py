@@ -21,7 +21,7 @@ Returns a dict compatible with the ResourceLedger's trade_net field:
   {"food": float, "materials": float, ...}  (positive = net import)
 
 Goods split:
-  Pool resources  (food, materials, energy, wealth, manpower, research)
+  Pool resources  (food, materials, energy, kapital, manpower, research)
       → NationResourcePool fields
   Manufactured    (consumer_goods, arms, fuel, machinery, chemicals,
                    medicine, components, heavy_equipment, military_goods)
@@ -29,7 +29,7 @@ Goods split:
 """
 from __future__ import annotations
 
-_POOL_FIELDS = frozenset(["food", "materials", "energy", "wealth", "manpower", "research"])
+_POOL_FIELDS = frozenset(["food", "materials", "energy", "kapital", "manpower", "research"])
 _GOOD_FIELDS = frozenset([
     "consumer_goods", "arms", "fuel", "machinery", "chemicals",
     "medicine", "components", "heavy_equipment", "military_goods",
@@ -96,6 +96,21 @@ def process_trade_imports(nation, turn_number: int, pool, good_stock) -> dict:
             stock_dirty = True
 
         trade_net[route.good] = trade_net.get(route.good, 0.0) + total_arrived
+
+        # Wealth & Taxation: consumption tax on imports + demand accumulator.
+        try:
+            from economy.pricing import record_demand
+            from economy.taxation import collect_consumption_tax, _apply_treasury_delta
+            from nations.tax_efficiency import compute_nation_tax_efficiency_base
+            prices = getattr(nation, "_prices_this_turn", {}) or {}
+            unit_price = float(prices.get(route.good, 1.0))
+            te_nation = compute_nation_tax_efficiency_base(nation)
+            amount = collect_consumption_tax(nation, route.good, total_arrived, unit_price, te_nation)
+            if amount:
+                _apply_treasury_delta(nation, amount)
+            record_demand(nation, route.good, total_arrived)
+        except Exception:
+            pass
 
         route.in_flight = still_flying
         route.save(update_fields=["in_flight"])

@@ -40,6 +40,16 @@ class Nation(models.Model):
         blank=True,
         related_name="capital_of_nation",
     )
+    # Wealth & Taxation System — player-set tax rate applied across all tax axes.
+    # Structure multipliers per axis (income/consumption/land/gift-estate) are
+    # determined by the relevant NationPolicy rank; tax_rate is the scalar.
+    tax_rate = models.FloatField(default=0.15)
+
+    # Wealth & Taxation System — {sector_key: rate ∈ [0, 1]}.
+    # Each turn a subsidy spends rate × treasury on goods from that sector,
+    # injecting demand that raises shortage_factor → prices → producer surplus.
+    subsidies = models.JSONField(default=dict)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

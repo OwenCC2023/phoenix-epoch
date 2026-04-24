@@ -45,6 +45,7 @@ Read the relevant system doc in `docs/systems/` before modifying a system.
 15. [Whitespace](docs/systems/whitespace_system.md) — unclaimed province simulation, de-integration, cross-provincial ideology melding, game-start init, population formula rework (relief/vegetation/temperature modifiers)
 16. [Control & Rebellion](docs/systems/control_rebellion_system.md) — per-province control (1–100%), Regions, production bonus/national flow trade-off, rebellion trigger/timer/outcomes, ideology interactions, whitespace rebel spawning
 17. [Development Points](docs/systems/development_points_system.md) — per-province, per-building-category DP; logarithmic multiplier approaching 2×; concentration bonus/penalty; 40 DP/year annual grant; ALLOCATE_DP and TRANSFER_DP orders; military DP stub
+18. [Wealth & Taxation](docs/systems/wealth_taxation_system.md) — food-equivalent pricing, Treasury, 4 parallel tax policy axes (income/consumption/land/gift-estate), Tax Efficiency, subsidies, debt with compounding interest; SET_TAX_RATE / SET_SUBSIDY / GOV_PURCHASE / GOV_SELL / GIFT_RESOURCES orders
 
 **Balance philosophy** — calibrated constants, food economy, industrialisation arc → [`docs/balance_philosophy.md`](docs/balance_philosophy.md)
 
@@ -79,7 +80,7 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe mana
 DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe manage.py makemigrations
 
 # Import smoke test
-DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "import django; django.setup(); from economy.simulation import simulate_nation_economy; from trade.simulation import recompute_route_paths; from nations.bureaucratic_capacity import compute_bureaucratic_supply; from economy.dp import compute_dp_multiplier; from economy.dp_init import initialize_province_dp; print('OK')"
+DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "import django; django.setup(); from economy.simulation import simulate_nation_economy; from trade.simulation import recompute_route_paths; from nations.bureaucratic_capacity import compute_bureaucratic_supply; from economy.dp import compute_dp_multiplier; from economy.dp_init import initialize_province_dp; from economy.pricing import compute_turn_start_prices; from economy.taxation import collect_nation_turn_taxes; from nations.tax_efficiency import compute_province_tax_efficiency; print('OK')"
 ```
 
 **Note:** Use `./venv/Scripts/python.exe` (not `python` — Windows Store intercept). Always set `DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev`.
@@ -90,9 +91,9 @@ DJANGO_SETTINGS_MODULE=phoenix_epoch.settings.dev ./venv/Scripts/python.exe -c "
 
 | App | Migrations |
 |-----|-----------|
-| economy | 0001_initial → 0007_control_pool_snapshot |
-| nations | 0001_initial → 0006_dp_pool_and_military |
-| provinces | 0001_initial → 0014_development_points |
+| economy | 0001_initial → 0009_treasury_and_market_snapshot |
+| nations | 0001_initial → 0007_treasury_and_market_snapshot |
+| provinces | 0001_initial → 0015_rename_wealth_kapital |
 | espionage | 0001_create_espionage_models |
 | trade | 0001_create_traderoute_capitalrelocation |
 | All others | 0001_initial |

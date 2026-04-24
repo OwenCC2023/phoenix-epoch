@@ -13,12 +13,12 @@ EVENT_TEMPLATES = {
     },
     "gold_rush": {
         "title": "Resource Discovery",
-        "description": "Prospectors have discovered rich mineral deposits, boosting material and wealth production.",
+        "description": "Prospectors have discovered rich mineral deposits, boosting material and kapital production.",
         "scope": "targeted",
         "effects": {
             "modifiers": [
                 {"category": "economy", "target": "materials", "modifier_type": "percentage", "value": 0.20, "duration": 5},
-                {"category": "economy", "target": "wealth", "modifier_type": "percentage", "value": 0.10, "duration": 5},
+                {"category": "economy", "target": "kapital", "modifier_type": "percentage", "value": 0.10, "duration": 5},
             ]
         },
     },
@@ -39,7 +39,7 @@ EVENT_TEMPLATES = {
         "scope": "targeted",
         "effects": {
             "modifiers": [
-                {"category": "economy", "target": "wealth", "modifier_type": "percentage", "value": 0.25, "duration": 6},
+                {"category": "economy", "target": "kapital", "modifier_type": "percentage", "value": 0.25, "duration": 6},
             ]
         },
     },
@@ -72,7 +72,7 @@ EVENT_TEMPLATES = {
         "effects": {
             "modifiers": [
                 {"category": "stability", "target": "stability", "modifier_type": "flat", "value": -15, "duration": 2},
-                {"category": "economy", "target": "wealth", "modifier_type": "percentage", "value": -0.10, "duration": 2},
+                {"category": "economy", "target": "kapital", "modifier_type": "percentage", "value": -0.10, "duration": 2},
             ]
         },
     },
